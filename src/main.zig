@@ -24,7 +24,16 @@ pub fn main() !void {
     try stdout.print("; {s} disassembly\n", .{file_path});
     try stdout.print("bits 16\n", .{});
 
-    try bw.flush(); // don't forget to flush!
+    var buffer: [2]u8 = undefined;
+
+    while (true) {
+        const bytes_read = try file.read(&buffer);
+        if (bytes_read == 0) break;
+        try stdout.print(".", .{});
+    }
+    try stdout.print("\n", .{});
+
+    try bw.flush();
 }
 
 test "simple test" {

@@ -29,16 +29,31 @@ pub fn main() !void {
     while (true) {
         const bytes_read = try file.read(&buffer);
         if (bytes_read == 0) break;
-        try stdout.print(".", .{});
+        const instruction = decodeInstruction(buffer);
+        try stdout.print("{s}", .{instruction.operation});
     }
     try stdout.print("\n", .{});
 
     try bw.flush();
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+const Instruction = struct {
+    operation: []const u8,
+};
+
+fn decodeInstruction(inst: [2]u8) Instruction {
+    _ = inst;
+    return Instruction{
+        .operation = "unknown",
+    };
+}
+
+test "Unknown instruction decodes as unknown" {
+    const result = decodeInstruction([_]u8{ 0b00000000, 0b00000000 });
+    try std.testing.expectEqualStrings("unknown", result.operation);
+}
+
+test "MOV Decode" {
+    const result = decodeInstruction([_]u8{ 0b10001000, 0b00000000 });
+    try std.testing.expectEqualStrings("mov", result.operation);
 }

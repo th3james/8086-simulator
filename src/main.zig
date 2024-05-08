@@ -29,31 +29,78 @@ pub fn main() !void {
     while (true) {
         const bytes_read = try file.read(&buffer);
         if (bytes_read == 0) break;
-        const instruction = decodeInstruction(buffer);
-        try stdout.print("{s}", .{instruction.operation});
+        const instruction = try decodeInstruction(buffer);
+        defer instruction.deinit(&std.heap.page_allocator);
+        try stdout.print("{s}\t", .{instruction.operation});
+        for (instruction.args) |arg| {
+            try stdout.print("{s}", .{arg});
+        }
+        try stdout.print("\n", .{});
     }
-    try stdout.print("\n", .{});
 
     try bw.flush();
 }
 
 const Instruction = struct {
     operation: []const u8,
+    args: []const []const u8,
+
+    fn deinit(self: *const Instruction, allocator: *const std.mem.Allocator) void {
+        if (@TypeOf(self.args) == []const []const u8) {
+            for (self.args) |arg| {
+                allocator.free(arg);
+            }
+            allocator.free(self.args);
+        }
+    }
 };
 
-fn decodeInstruction(inst: [2]u8) Instruction {
-    _ = inst;
-    return Instruction{
-        .operation = "unknown",
-    };
+fn decodeInstruction(inst: [2]u8) !Instruction {
+    const opcode = inst[0] & 0b11111100;
+    var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
+    defer args.deinit();
+
+    switch (opcode) {
+        0b10001000 => {
+            const regIsDestination = (inst[0] & 0b00000010) != 0;
+            _ = regIsDestination;
+            const wide = (inst[0] & 0b00000001) != 0;
+            _ = wide;
+            const mod = inst[1] & 0b11000000;
+            _ = mod;
+            const regToReg = (inst[1] & 0b11000000) == 192;
+            const reg = inst[1] & 0b00111000;
+            _ = reg;
+            const regOrMem = inst[1] & 0b00000111;
+            _ = regOrMem;
+
+            if (regToReg) {
+                try args.append(try std.heap.page_allocator.dupe(u8, "unknown"));
+            } else {
+                try args.append(try std.heap.page_allocator.dupe(u8, "unsupported"));
+            }
+            return Instruction{ .operation = "mov", .args = try args.toOwnedSlice() };
+        },
+        else => {
+            return Instruction{ .operation = "unknown", .args = try args.toOwnedSlice() };
+        },
+    }
 }
 
 test "Unknown instruction decodes as unknown" {
-    const result = decodeInstruction([_]u8{ 0b00000000, 0b00000000 });
+    const result = try decodeInstruction([_]u8{ 0b00000000, 0b00000000 });
+    defer result.deinit(&std.heap.page_allocator);
     try std.testing.expectEqualStrings("unknown", result.operation);
 }
 
 test "MOV Decode" {
-    const result = decodeInstruction([_]u8{ 0b10001000, 0b00000000 });
+    const result = try decodeInstruction([_]u8{ 0b10001000, 0b00000000 });
+    defer result.deinit(&std.heap.page_allocator);
     try std.testing.expectEqualStrings("mov", result.operation);
+
+    // only Reg to Reg (for now)
+    const unsupported = try decodeInstruction([_]u8{ 0b10001000, 0b00000000 });
+    defer unsupported.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 1), unsupported.args.len);
+    try std.testing.expectEqualStrings("unsupported", unsupported.args[0]);
 }

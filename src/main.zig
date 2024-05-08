@@ -31,7 +31,7 @@ pub fn main() !void {
         if (bytes_read == 0) break;
         const instruction = try decodeInstruction(buffer);
         defer instruction.deinit(&std.heap.page_allocator);
-        try stdout.print("{s}\t", .{instruction.operation});
+        try stdout.print("{s} ", .{instruction.operation});
         for (instruction.args) |arg| {
             try stdout.print("{s}", .{arg});
         }
@@ -93,12 +93,13 @@ test "Unknown instruction decodes as unknown" {
     try std.testing.expectEqualStrings("unknown", result.operation);
 }
 
-test "MOV Decode" {
+test "MOV Decode - operation" {
     const result = try decodeInstruction([_]u8{ 0b10001000, 0b00000000 });
     defer result.deinit(&std.heap.page_allocator);
     try std.testing.expectEqualStrings("mov", result.operation);
+}
 
-    // only Reg to Reg (for now)
+test "MOV Decode - Reg to Reg only" {
     const unsupported = try decodeInstruction([_]u8{ 0b10001000, 0b00000000 });
     defer unsupported.deinit(&std.heap.page_allocator);
     try std.testing.expectEqual(@as(usize, 1), unsupported.args.len);

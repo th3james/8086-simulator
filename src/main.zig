@@ -44,12 +44,10 @@ const Instruction = struct {
     args: []const []const u8,
 
     fn deinit(self: *const Instruction, allocator: *const std.mem.Allocator) void {
-        if (@TypeOf(self.args) == []const []const u8) {
-            for (self.args) |arg| {
-                allocator.free(arg);
-            }
-            allocator.free(self.args);
+        for (self.args) |arg| {
+            allocator.free(arg);
         }
+        allocator.free(self.args);
     }
 };
 

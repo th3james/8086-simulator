@@ -88,68 +88,28 @@ fn decodeInstruction(inst: [2]u8) !Instruction {
     }
 }
 
+const RegisterName = struct {
+    narrow: []const u8,
+    wide: []const u8,
+};
+const registerMap = [_]RegisterName{
+    RegisterName{ .narrow = "al", .wide = "ax" },
+    RegisterName{ .narrow = "cl", .wide = "cx" },
+    RegisterName{ .narrow = "dl", .wide = "dx" },
+    RegisterName{ .narrow = "bl", .wide = "bx" },
+    RegisterName{ .narrow = "ah", .wide = "sp" },
+    RegisterName{ .narrow = "ch", .wide = "bp" },
+    RegisterName{ .narrow = "dh", .wide = "si" },
+    RegisterName{ .narrow = "bh", .wide = "di" },
+};
+
 fn registerName(reg: u8, wide: bool) []const u8 {
-    switch (reg) {
-        0b000 => {
-            if (wide) {
-                return "ax";
-            } else {
-                return "al";
-            }
-        },
-        0b001 => {
-            if (wide) {
-                return "cx";
-            } else {
-                return "cl";
-            }
-        },
-        0b010 => {
-            if (wide) {
-                return "dx";
-            } else {
-                return "dl";
-            }
-        },
-        0b011 => {
-            if (wide) {
-                return "bx";
-            } else {
-                return "bl";
-            }
-        },
-        0b100 => {
-            if (wide) {
-                return "sp";
-            } else {
-                return "ah";
-            }
-        },
-        0b101 => {
-            if (wide) {
-                return "bp";
-            } else {
-                return "ch";
-            }
-        },
-        0b110 => {
-            if (wide) {
-                return "si";
-            } else {
-                return "dh";
-            }
-        },
-        0b111 => {
-            if (wide) {
-                return "di";
-            } else {
-                return "bh";
-            }
-        },
-        else => {
-            return "xx";
-        },
+    if (reg >= registerMap.len) {
+        return "xx"; // Unknown or invalid register code
     }
+
+    const names = registerMap[reg];
+    return if (wide) names.wide else names.narrow;
 }
 
 test "Unknown instruction decodes as unknown" {

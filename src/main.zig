@@ -6,7 +6,7 @@ pub fn main() !void {
 
     if (args.len != 2) {
         std.debug.print("Usage: {s} <file_path>\n", .{args[0]});
-        std.os.exit(1);
+        std.process.exit(1);
     }
 
     const file_path = args[1];

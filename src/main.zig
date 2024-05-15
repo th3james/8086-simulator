@@ -52,6 +52,7 @@ const Instruction = struct {
 };
 
 fn decodeInstruction(inst: [2]u8) !Instruction {
+    // TODO convert bit masks to defines
     const opcode = inst[0] & 0b11111100;
     var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
     defer args.deinit();

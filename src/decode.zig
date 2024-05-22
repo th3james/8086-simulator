@@ -6,14 +6,19 @@ pub const DisplacementSize = enum {
     none,
 };
 
+const OpcodeId = enum {
+    mov,
+    unknown,
+};
+
 const Opcode = struct {
     base: [2]u8,
+    id: OpcodeId,
     name: []const u8,
     displacement_size: DisplacementSize,
 };
 
 const Instruction = struct {
-    operation: []const u8,
     args: []const []const u8,
 
     pub fn deinit(self: *const Instruction, allocator: *const std.mem.Allocator) void {
@@ -30,33 +35,33 @@ pub fn decodeOpcode(inst: [2]u8) Opcode {
     const opcode = inst[0] & OPCODE_MASK;
     switch (opcode) {
         0b10001000 => {
-            return Opcode{ .base = inst, .name = "mov", .displacement_size = DisplacementSize.none };
+            return Opcode{ .base = inst, .id = OpcodeId.mov, .name = "mov", .displacement_size = DisplacementSize.none };
         },
         else => {
-            return Opcode{ .base = inst, .name = "unknown", .displacement_size = DisplacementSize.none };
+            return Opcode{ .base = inst, .id = OpcodeId.unknown, .name = "unknown", .displacement_size = DisplacementSize.none };
         },
     }
 }
 
-test "Unknown opcode decodes as unknown" {
+test "decodeOpcode - Unknown opcode decodes as unknown" {
     const result = decodeOpcode([_]u8{ 0b00000000, 0b00000000 });
+    try std.testing.expectEqual(OpcodeId.unknown, result.id);
     try std.testing.expectEqualStrings("unknown", result.name);
 }
 
-test "Reg-to-reg MOV Decode" {
+test "decodeOpcode - Reg-to-reg MOV Decode" {
     const result = decodeOpcode([_]u8{ 0b10001000, 0b00000000 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.none, result.displacement_size);
 }
 
 pub fn decodeInstruction(the_opcode: Opcode) !Instruction {
-    const OPCODE_MASK: u8 = 0b11111100;
-    // TODO convert bit masks to defines
-    const opcode = the_opcode.base[0] & OPCODE_MASK;
     var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
     defer args.deinit();
 
-    switch (opcode) {
-        0b10001000 => {
+    switch (the_opcode.id) {
+        OpcodeId.mov => {
             const REG_DESTINATION_MASK: u8 = 0b00000010;
             const REG_OR_MEM_MASK: u8 = 0b00000111;
             const WIDE_MASK: u8 = 0b00000001;
@@ -88,12 +93,29 @@ pub fn decodeInstruction(the_opcode: Opcode) !Instruction {
             } else {
                 try args.append(try std.heap.page_allocator.dupe(u8, "unsupported"));
             }
-            return Instruction{ .operation = "mov", .args = try args.toOwnedSlice() };
+            return Instruction{ .args = try args.toOwnedSlice() };
         },
-        else => {
-            return Instruction{ .operation = "unknown", .args = try args.toOwnedSlice() };
+        OpcodeId.unknown => {
+            return Instruction{ .args = try args.toOwnedSlice() };
         },
     }
+}
+
+test "decodeInstruction - MOV Decode - Reg to Reg only" {
+    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000000 });
+    const unsupported = try decodeInstruction(opcode);
+    defer unsupported.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 1), unsupported.args.len);
+    try std.testing.expectEqualStrings("unsupported", unsupported.args[0]);
+}
+
+test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
+    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b11000001 });
+    const unsupported = try decodeInstruction(opcode);
+    defer unsupported.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 2), unsupported.args.len);
+    try std.testing.expectEqualStrings(registerName(0b1, false), unsupported.args[0]);
+    try std.testing.expectEqualStrings(registerName(0b0, false), unsupported.args[1]);
 }
 
 const RegisterName = struct {
@@ -118,37 +140,6 @@ fn registerName(reg: u8, wide: bool) []const u8 {
 
     const names = registerMap[reg];
     return if (wide) names.wide else names.narrow;
-}
-
-test "Unknown instruction decodes as unknown" {
-    const opcode = decodeOpcode([_]u8{ 0b00000000, 0b00000000 });
-    const result = try decodeInstruction(opcode);
-    defer result.deinit(&std.heap.page_allocator);
-    try std.testing.expectEqualStrings("unknown", result.operation);
-}
-
-test "MOV Decode - operation" {
-    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000000 });
-    const result = try decodeInstruction(opcode);
-    defer result.deinit(&std.heap.page_allocator);
-    try std.testing.expectEqualStrings("mov", result.operation);
-}
-
-test "MOV Decode - Reg to Reg only" {
-    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000000 });
-    const unsupported = try decodeInstruction(opcode);
-    defer unsupported.deinit(&std.heap.page_allocator);
-    try std.testing.expectEqual(@as(usize, 1), unsupported.args.len);
-    try std.testing.expectEqualStrings("unsupported", unsupported.args[0]);
-}
-
-test "MOV Decode - Reg to Reg permutations" {
-    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b11000001 });
-    const unsupported = try decodeInstruction(opcode);
-    defer unsupported.deinit(&std.heap.page_allocator);
-    try std.testing.expectEqual(@as(usize, 2), unsupported.args.len);
-    try std.testing.expectEqualStrings(registerName(0b1, false), unsupported.args[0]);
-    try std.testing.expectEqualStrings(registerName(0b0, false), unsupported.args[1]);
 }
 
 test "registerName options" {

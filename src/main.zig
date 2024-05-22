@@ -54,7 +54,7 @@ pub fn main() !void {
 
         const args_str = try std.mem.join(std.heap.page_allocator, ", ", instruction.args);
         defer std.heap.page_allocator.free(args_str);
-        try stdout.print("{s} {s}\n", .{ instruction.operation, args_str });
+        try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }
 
     try bw.flush();

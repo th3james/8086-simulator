@@ -1,4 +1,5 @@
 const std = @import("std");
+const mov = @import("mov.zig");
 
 pub const DisplacementSize = enum {
     wide,
@@ -31,11 +32,25 @@ const Instruction = struct {
 
 pub fn decodeOpcode(inst: [2]u8) Opcode {
     const OPCODE_MASK: u8 = 0b11111100;
-    // TODO convert bit masks to defines
     const opcode = inst[0] & OPCODE_MASK;
     switch (opcode) {
         0b10001000 => {
-            return Opcode{ .base = inst, .id = OpcodeId.mov, .name = "mov", .displacement_size = DisplacementSize.none };
+            var displacement_size: DisplacementSize = DisplacementSize.none;
+            switch (mov.mod(inst)) {
+                0b00 => {
+                    if (mov.regOrMem(inst) == 0b110) {
+                        displacement_size = DisplacementSize.wide;
+                    }
+                },
+                0b01 => {
+                    displacement_size = DisplacementSize.narrow;
+                },
+                0b10 => {
+                    displacement_size = DisplacementSize.wide;
+                },
+                else => {},
+            }
+            return Opcode{ .base = inst, .id = OpcodeId.mov, .name = "mov", .displacement_size = displacement_size };
         },
         else => {
             return Opcode{ .base = inst, .id = OpcodeId.unknown, .name = "unknown", .displacement_size = DisplacementSize.none };
@@ -49,11 +64,39 @@ test "decodeOpcode - Unknown opcode decodes as unknown" {
     try std.testing.expectEqualStrings("unknown", result.name);
 }
 
-test "decodeOpcode - Reg-to-reg MOV Decode" {
+test "decodeOpcode - MOV Memory mode, no displacement" {
     const result = decodeOpcode([_]u8{ 0b10001000, 0b00000000 });
     try std.testing.expectEqual(OpcodeId.mov, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
     try std.testing.expectEqual(DisplacementSize.none, result.displacement_size);
+}
+
+test "decodeOpcode - MOV Memory mode, direct address" {
+    const result = decodeOpcode([_]u8{ 0b10001000, 0b00000110 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
+}
+
+test "decodeOpcode - Reg-to-reg MOV Decode" {
+    const result = decodeOpcode([_]u8{ 0b10001000, 0b11000000 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.none, result.displacement_size);
+}
+
+test "decodeOpcode - MOV Decode Memory mode 8-bit" {
+    const result = decodeOpcode([_]u8{ 0b10001000, 0b01000000 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.narrow, result.displacement_size);
+}
+
+test "decodeOpcode - MOV Decode Memory mode 16-bit" {
+    const result = decodeOpcode([_]u8{ 0b10001000, 0b10000000 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
 }
 
 pub fn decodeInstruction(the_opcode: Opcode) !Instruction {
@@ -62,28 +105,20 @@ pub fn decodeInstruction(the_opcode: Opcode) !Instruction {
 
     switch (the_opcode.id) {
         OpcodeId.mov => {
-            const REG_DESTINATION_MASK: u8 = 0b00000010;
-            const REG_OR_MEM_MASK: u8 = 0b00000111;
-            const WIDE_MASK: u8 = 0b00000001;
-            const MOD_MASK: u8 = 0b11000000;
             const REG_TO_REG_MASK: u8 = 0b11000000;
+            const WIDE_MASK: u8 = 0b00000001;
             const REG_MASK: u8 = 0b00111000;
 
             //std.debug.print("\n# Decoding Mov {b}, {b}\n", .{ inst[0], inst[1] });
-            const regIsDestination = (the_opcode.base[0] & REG_DESTINATION_MASK) != 0;
 
             const wide = (the_opcode.base[0] & WIDE_MASK) != 0;
             //std.debug.print("\twide: {}, ", .{wide});
-            const mod = the_opcode.base[1] & MOD_MASK;
-            _ = mod;
             const regToReg = (the_opcode.base[1] & REG_TO_REG_MASK) == 192;
-
             const reg = (the_opcode.base[1] & REG_MASK) >> 3;
-            //std.debug.print("\treg: {b}\n", .{reg});
-            const regOrMem = the_opcode.base[1] & REG_OR_MEM_MASK;
+            const regOrMem = mov.regOrMem(the_opcode.base);
 
             if (regToReg) {
-                if (regIsDestination) {
+                if (mov.regIsDestination(the_opcode.base)) {
                     try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, wide)));
                     try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, wide)));
                 } else {

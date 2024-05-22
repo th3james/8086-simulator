@@ -1,5 +1,5 @@
 const std = @import("std");
-const decode = @import("decode.zig");
+const decode = @import("decode/core.zig");
 
 const InvalidBinaryErrors = error{MissingDisplacementError};
 

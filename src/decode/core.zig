@@ -53,6 +53,7 @@ pub fn decodeOpcode(inst: [2]u8) Opcode {
             return Opcode{ .base = inst, .id = OpcodeId.mov, .name = "mov", .displacement_size = displacement_size };
         },
         else => {
+            std.debug.print("unknown opcode: {b} {b}\n", .{ inst[0], inst[1] });
             return Opcode{ .base = inst, .id = OpcodeId.unknown, .name = "unknown", .displacement_size = DisplacementSize.none };
         },
     }
@@ -99,34 +100,55 @@ test "decodeOpcode - MOV Decode Memory mode 16-bit" {
     try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
 }
 
-pub fn decodeInstruction(the_opcode: Opcode) !Instruction {
+test "decodeOpcode - MOV Immediate to register" {
+    const result = decodeOpcode([_]u8{ 0b10110001, 0b00000011 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
+}
+
+fn concat_u8_to_u16(array: [2]u8) u16 {
+    var result: u16 = array[0];
+    result = result << 8;
+    return result | array[1];
+}
+
+pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
     var args = std.ArrayList([]const u8).init(std.heap.page_allocator);
     defer args.deinit();
 
-    switch (the_opcode.id) {
+    switch (opcode.id) {
         OpcodeId.mov => {
-            const REG_TO_REG_MASK: u8 = 0b11000000;
             const WIDE_MASK: u8 = 0b00000001;
             const REG_MASK: u8 = 0b00111000;
 
-            //std.debug.print("\n# Decoding Mov {b}, {b}\n", .{ inst[0], inst[1] });
+            //std.debug.print("\n# Decoding Mov {b}, {b}\n", .{ opcode.base[0], opcode.base[1] });
 
-            const wide = (the_opcode.base[0] & WIDE_MASK) != 0;
-            //std.debug.print("\twide: {}, ", .{wide});
-            const regToReg = (the_opcode.base[1] & REG_TO_REG_MASK) == 192;
-            const reg = (the_opcode.base[1] & REG_MASK) >> 3;
-            const regOrMem = mov.regOrMem(the_opcode.base);
+            const wide = (opcode.base[0] & WIDE_MASK) != 0;
+            const reg = (opcode.base[1] & REG_MASK) >> 3;
+            const regOrMem = mov.regOrMem(opcode.base);
 
-            if (regToReg) {
-                if (mov.regIsDestination(the_opcode.base)) {
-                    try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, wide)));
-                    try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, wide)));
-                } else {
-                    try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, wide)));
-                    try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, wide)));
-                }
-            } else {
-                try args.append(try std.heap.page_allocator.dupe(u8, "unsupported"));
+            switch (mov.mod(opcode.base)) {
+                0b00 => { // Memory mode, no displacement
+                    if (regOrMem == 0b110) { // Direct address
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, wide)));
+                        const memory_address = concat_u8_to_u16(displacement);
+                        const memory_address_str = try std.fmt.allocPrint(std.heap.page_allocator, "{}", .{memory_address});
+                        try args.append(memory_address_str);
+                    }
+                },
+                0b11 => { // Register to Register
+                    if (mov.regIsDestination(opcode.base)) {
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, wide)));
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, wide)));
+                    } else {
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, wide)));
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, wide)));
+                    }
+                },
+                else => {
+                    try args.append(try std.heap.page_allocator.dupe(u8, "unsupported"));
+                },
             }
             return Instruction{ .args = try args.toOwnedSlice() };
         },
@@ -136,21 +158,22 @@ pub fn decodeInstruction(the_opcode: Opcode) !Instruction {
     }
 }
 
-test "decodeInstruction - MOV Decode - Reg to Reg only" {
-    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000000 });
-    const unsupported = try decodeInstruction(opcode);
-    defer unsupported.deinit(&std.heap.page_allocator);
-    try std.testing.expectEqual(@as(usize, 1), unsupported.args.len);
-    try std.testing.expectEqualStrings("unsupported", unsupported.args[0]);
-}
-
 test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b11000001 });
-    const unsupported = try decodeInstruction(opcode);
-    defer unsupported.deinit(&std.heap.page_allocator);
-    try std.testing.expectEqual(@as(usize, 2), unsupported.args.len);
-    try std.testing.expectEqualStrings(registerName(0b1, false), unsupported.args[0]);
-    try std.testing.expectEqualStrings(registerName(0b0, false), unsupported.args[1]);
+    const result = try decodeInstruction(opcode, [_]u8{ 0, 0 });
+    defer result.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(registerName(0b1, false), result.args[0]);
+    try std.testing.expectEqualStrings(registerName(0b0, false), result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Direct address move" {
+    const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000110 });
+    const result = try decodeInstruction(opcode, [_]u8{ 0b1, 0b1 });
+    defer result.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(registerName(0b0, false), result.args[0]);
+    try std.testing.expectEqualStrings("257", result.args[1]);
 }
 
 const RegisterName = struct {

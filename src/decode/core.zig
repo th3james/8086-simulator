@@ -1,5 +1,6 @@
 const std = @import("std");
 const mov = @import("mov.zig");
+const opcode_masks = @import("opcode_masks.zig");
 
 pub const DisplacementSize = enum {
     wide,
@@ -31,14 +32,22 @@ const Instruction = struct {
 };
 
 pub fn decodeOpcode(inst: [2]u8) Opcode {
-    const OPCODE_MASK: u8 = 0b11111100;
-    const opcode = inst[0] & OPCODE_MASK;
-    switch (opcode) {
-        0b10001000 => {
+    var opcode_id = opcode_masks.OpcodeId.unknown;
+
+    for (opcode_masks.OpcodeTable) |mask| {
+        if ((inst[0] & mask.identifier_mask) == mask.identifier) {
+            opcode_id = mask.id;
+            break;
+        }
+    }
+
+    switch (opcode_id) {
+        opcode_masks.OpcodeId.movRegOrMemToFromReg => {
+            const options = opcode_masks.parseOptions(opcode_id, inst);
             var displacement_size: DisplacementSize = DisplacementSize.none;
-            switch (mov.mod(inst)) {
+            switch (options.mod) {
                 0b00 => {
-                    if (mov.regOrMem(inst) == 0b110) {
+                    if (options.regOrMem == 0b110) {
                         displacement_size = DisplacementSize.wide;
                     }
                 },
@@ -52,7 +61,17 @@ pub fn decodeOpcode(inst: [2]u8) Opcode {
             }
             return Opcode{ .base = inst, .id = OpcodeId.mov, .name = "mov", .displacement_size = displacement_size };
         },
-        else => {
+        opcode_masks.OpcodeId.movImmediateToReg => {
+            var displacement_size: DisplacementSize = DisplacementSize.none;
+
+            const options = opcode_masks.parseOptions(opcode_id, inst);
+            if (options.wide) {
+                displacement_size = DisplacementSize.narrow;
+            }
+
+            return Opcode{ .base = inst, .id = OpcodeId.mov, .name = "mov", .displacement_size = displacement_size };
+        },
+        opcode_masks.OpcodeId.unknown => {
             std.debug.print("unknown opcode: {b} {b}\n", .{ inst[0], inst[1] });
             return Opcode{ .base = inst, .id = OpcodeId.unknown, .name = "unknown", .displacement_size = DisplacementSize.none };
         },
@@ -100,11 +119,18 @@ test "decodeOpcode - MOV Decode Memory mode 16-bit" {
     try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
 }
 
-test "decodeOpcode - MOV Immediate to register" {
-    const result = decodeOpcode([_]u8{ 0b10110001, 0b00000011 });
+test "decodeOpcode - MOV Immediate to register narrow" {
+    const result = decodeOpcode([_]u8{ 0b10110001, 0b00000000 });
     try std.testing.expectEqual(OpcodeId.mov, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
-    try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
+    try std.testing.expectEqual(DisplacementSize.none, result.displacement_size);
+}
+
+test "decodeOpcode - MOV Immediate to register wide" {
+    const result = decodeOpcode([_]u8{ 0b10111000, 0b00000000 });
+    try std.testing.expectEqual(OpcodeId.mov, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(DisplacementSize.narrow, result.displacement_size);
 }
 
 fn concat_u8_to_u16(array: [2]u8) u16 {

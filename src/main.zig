@@ -49,7 +49,7 @@ pub fn main() !void {
             else => {},
         }
 
-        const instruction = try decode.decodeInstruction(opcode);
+        const instruction = try decode.decodeInstruction(opcode, displacement);
         defer instruction.deinit(&std.heap.page_allocator);
 
         const args_str = try std.mem.join(std.heap.page_allocator, ", ", instruction.args);

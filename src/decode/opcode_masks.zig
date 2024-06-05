@@ -23,7 +23,7 @@ pub fn parseOptions(id: OpcodeId, instruction: [2]u8) OpcodeOptions {
             return OpcodeOptions{
                 .wide = (instruction[0] & 0b00000001) != 0,
                 .mod = @intCast((instruction[1] & 0b11000000) >> 6),
-                .reg = 0, // TODO
+                .reg = @intCast((instruction[1] & 0b00111000) >> 3),
                 .regOrMem = @intCast(instruction[1] & 0b00000111),
             };
         },

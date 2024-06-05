@@ -140,15 +140,10 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
 
     switch (opcode.id) {
         opcode_masks.OpcodeId.movRegOrMemToFromReg => {
-            const REG_MASK: u8 = 0b00111000;
-
-            const reg = (opcode.base[1] & REG_MASK) >> 3;
-            const regOrMem = mov.regOrMem(opcode.base);
-
             switch (opcode.options.mod) {
                 0b00 => { // Memory mode, no displacement
-                    if (regOrMem == 0b110) { // Direct address
-                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, opcode.options.wide)));
+                    if (opcode.options.regOrMem == 0b110) { // Direct address
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(opcode.options.reg, opcode.options.wide)));
                         const memory_address = concat_u8_to_u16(displacement);
                         const memory_address_str = try std.fmt.allocPrint(std.heap.page_allocator, "{}", .{memory_address});
                         try args.append(memory_address_str);
@@ -156,11 +151,11 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
                 },
                 0b11 => { // Register to Register
                     if (mov.regIsDestination(opcode.base)) {
-                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, opcode.options.wide)));
-                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, opcode.options.wide)));
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(opcode.options.reg, opcode.options.wide)));
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(opcode.options.regOrMem, opcode.options.wide)));
                     } else {
-                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(regOrMem, opcode.options.wide)));
-                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(reg, opcode.options.wide)));
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(opcode.options.regOrMem, opcode.options.wide)));
+                        try args.append(try std.heap.page_allocator.dupe(u8, registerName(opcode.options.reg, opcode.options.wide)));
                     }
                 },
                 else => {

@@ -147,6 +147,9 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
                         const memory_address = concat_u8_to_u16(displacement);
                         const memory_address_str = try std.fmt.allocPrint(std.heap.page_allocator, "{}", .{memory_address});
                         try args.append(memory_address_str);
+                    } else {
+                        // TODO Table 4-10. R/M (Register/Memory) Field Encoding
+                        try args.append(try std.heap.page_allocator.dupe(u8, "unsupported effective address"));
                     }
                 },
                 0b11 => { // Register to Register
@@ -165,8 +168,21 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
             return Instruction{ .args = try args.toOwnedSlice() };
         },
         opcode_masks.OpcodeId.movImmediateToReg => {
-            // TODO
-            try args.append(try std.heap.page_allocator.dupe(u8, "unsupported mov immediate"));
+            try args.append(try std.heap.page_allocator.dupe(u8, registerName(opcode.options.reg, opcode.options.wide)));
+
+            if (opcode.options.wide) {
+                const data_signed = concat_u8_to_u16([2]u8{
+                    displacement[0],
+                    opcode.base[1],
+                });
+                const data: i16 = @bitCast(data_signed);
+                const data_str = try std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{data});
+                try args.append(data_str);
+            } else {
+                const data: i8 = @bitCast(opcode.base[1]);
+                const data_str = try std.fmt.allocPrint(std.heap.page_allocator, "{d}", .{data});
+                try args.append(data_str);
+            }
             return Instruction{ .args = try args.toOwnedSlice() };
         },
         opcode_masks.OpcodeId.unknown => {
@@ -191,6 +207,33 @@ test "decodeInstruction - MOV Decode - Direct address move" {
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(registerName(0b0, false), result.args[0]);
     try std.testing.expectEqualStrings("257", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
+    const opcode = decodeOpcode([_]u8{ 0b10110001, 0b00000110 });
+    const result = try decodeInstruction(opcode, [_]u8{ 0b0, 0b0 });
+    defer result.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(registerName(0b1, false), result.args[0]);
+    try std.testing.expectEqualStrings("6", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
+    const opcode = decodeOpcode([_]u8{ 0b10110001, 0b11111010 });
+    const result = try decodeInstruction(opcode, [_]u8{ 0b0, 0b0 });
+    defer result.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(registerName(0b1, false), result.args[0]);
+    try std.testing.expectEqualStrings("-6", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register wide" {
+    const opcode = decodeOpcode([_]u8{ 0b10111001, 0b11111101 });
+    const result = try decodeInstruction(opcode, [_]u8{ 0b11111111, 0b0 });
+    defer result.deinit(&std.heap.page_allocator);
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(registerName(0b1, true), result.args[0]);
+    try std.testing.expectEqualStrings("-3", result.args[1]);
 }
 
 const RegisterName = struct {

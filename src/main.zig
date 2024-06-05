@@ -44,7 +44,7 @@ pub fn main() !void {
                 var narrow_buffer: [1]u8 = undefined;
                 const further_bytes_read = try file.read(&narrow_buffer);
                 if (further_bytes_read == 0) return InvalidBinaryErrors.MissingDisplacementError;
-                displacement[1] = buffer[0];
+                displacement[0] = narrow_buffer[0];
             },
             else => {},
         }

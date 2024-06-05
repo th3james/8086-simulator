@@ -10,7 +10,7 @@ const OpcodeMask = struct {
     id: OpcodeId,
 };
 
-const OpcodeOptions = struct {
+pub const OpcodeOptions = struct {
     wide: bool,
     mod: u2,
     reg: u3,
@@ -21,7 +21,7 @@ pub fn parseOptions(id: OpcodeId, instruction: [2]u8) OpcodeOptions {
     switch (id) {
         OpcodeId.movRegOrMemToFromReg => {
             return OpcodeOptions{
-                .wide = (instruction[0] & 0b00000010) != 0,
+                .wide = (instruction[0] & 0b00000001) != 0,
                 .mod = @intCast((instruction[1] & 0b11000000) >> 6),
                 .reg = 0, // TODO
                 .regOrMem = @intCast(instruction[1] & 0b00000111),

@@ -149,7 +149,25 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
                         try args.append(memory_address_str);
                     } else {
                         // TODO Table 4-10. R/M (Register/Memory) Field Encoding
-                        try args.append(try std.heap.page_allocator.dupe(u8, "unsupported effective address"));
+                        if (mov.regIsDestination(opcode.base)) {
+                            try args.append(try std.heap.page_allocator.dupe(
+                                u8,
+                                registerName(opcode.options.reg, opcode.options.wide),
+                            ));
+                            try args.append(try std.heap.page_allocator.dupe(
+                                u8,
+                                effectiveAddress(opcode.options.regOrMem, opcode.options.mod),
+                            ));
+                        } else {
+                            try args.append(try std.heap.page_allocator.dupe(
+                                u8,
+                                effectiveAddress(opcode.options.regOrMem, opcode.options.mod),
+                            ));
+                            try args.append(try std.heap.page_allocator.dupe(
+                                u8,
+                                registerName(opcode.options.reg, opcode.options.wide),
+                            ));
+                        }
                     }
                 },
                 0b11 => { // Register to Register
@@ -263,4 +281,10 @@ fn registerName(reg: u8, wide: bool) []const u8 {
 test "registerName options" {
     try std.testing.expectEqualStrings("al", registerName(0b000, false));
     try std.testing.expectEqualStrings("cx", registerName(0b001, true));
+}
+
+fn effectiveAddress(regOrMem: u3, mod: u2) []const u8 {
+    _ = regOrMem;
+    _ = mod;
+    return "TODO effective address";
 }

@@ -148,7 +148,7 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
                         const memory_address_str = try std.fmt.allocPrint(std.heap.page_allocator, "{}", .{memory_address});
                         try args.append(memory_address_str);
                     } else {
-                        // Table 4-10. R/M (Register/Memory) Field Encoding
+                        // TODO this is duplicated
                         const effectiveAddress = effectiveAddressRegisters(opcode.options.regOrMem, opcode.options.mod, displacement);
                         if (mov.regIsDestination(opcode.base)) {
                             try args.append(try std.heap.page_allocator.dupe(
@@ -175,7 +175,21 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8) !Instruction {
                     }
                 },
                 else => {
-                    try args.append(try std.heap.page_allocator.dupe(u8, "unsupported"));
+                    // TODO this is duplicated
+                    const effectiveAddress = effectiveAddressRegisters(opcode.options.regOrMem, opcode.options.mod, displacement);
+                    if (mov.regIsDestination(opcode.base)) {
+                        try args.append(try std.heap.page_allocator.dupe(
+                            u8,
+                            registerName(opcode.options.reg, opcode.options.wide),
+                        ));
+                        try args.append(try renderEffectiveAddress(effectiveAddress, std.heap.page_allocator));
+                    } else {
+                        try args.append(try renderEffectiveAddress(effectiveAddress, std.heap.page_allocator));
+                        try args.append(try std.heap.page_allocator.dupe(
+                            u8,
+                            registerName(opcode.options.reg, opcode.options.wide),
+                        ));
+                    }
                 },
             }
             return Instruction{ .args = try args.toOwnedSlice() };
@@ -292,10 +306,22 @@ const effectiveAddressRegisterMap = [_][2][2]u8{
 const EffectiveAddress = struct { r1: [2]u8, r2: [2]u8, displacement: u16 };
 // Table 4-10. R/M (Register/Memory) Field Encoding
 fn effectiveAddressRegisters(regOrMem: u3, mod: u2, displacement: [2]u8) EffectiveAddress {
-    _ = mod;
-    _ = displacement;
+    var offset: u16 = 0;
     const names = effectiveAddressRegisterMap[regOrMem];
-    return EffectiveAddress{ .r1 = names[0], .r2 = names[1], .displacement = 0 };
+
+    switch (mod) {
+        0b01 => {
+            offset = @intCast(displacement[0]);
+        },
+        0b10 => {
+            offset = concat_u8_to_u16([2]u8{
+                displacement[1],
+                displacement[0],
+            });
+        },
+        else => {},
+    }
+    return EffectiveAddress{ .r1 = names[0], .r2 = names[1], .displacement = offset };
 }
 
 test "effective address options no displacement" {
@@ -306,17 +332,17 @@ test "effective address options no displacement" {
 }
 
 test "effective address options 8-bit displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b01, [_]u8{ 0b0, 0b1 });
+    const result = effectiveAddressRegisters(0b000, 0b01, [_]u8{ 0b1, 0b0 });
     try std.testing.expectEqualStrings("bx", &result.r1);
     try std.testing.expectEqualStrings("si", &result.r2);
     try std.testing.expectEqual(1, result.displacement);
 }
 
 test "effective address options 16-bit displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b10, [_]u8{ 0b1, 0b1 });
+    const result = effectiveAddressRegisters(0b000, 0b10, [_]u8{ 0b10, 0b1 });
     try std.testing.expectEqualStrings("bx", &result.r1);
     try std.testing.expectEqualStrings("si", &result.r2);
-    try std.testing.expectEqual(257, result.displacement);
+    try std.testing.expectEqual(258, result.displacement);
 }
 
 fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem.Allocator) ![]const u8 {
@@ -324,11 +350,19 @@ fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem
     defer args.deinit();
 
     try args.append(try allocator.dupe(u8, &effectiveAddress.r1));
-    try args.append(try allocator.dupe(u8, &effectiveAddress.r2));
+    if ((effectiveAddress.r2[0] != '0') and (effectiveAddress.r2[0] != '0')) {
+        try args.append(try allocator.dupe(u8, &effectiveAddress.r2));
+    }
+
+    if (effectiveAddress.displacement != 0) {
+        try args.append(
+            try std.fmt.allocPrint(allocator, "{d}", .{effectiveAddress.displacement}),
+        );
+    }
 
     const args_str = try std.mem.join(allocator, " + ", try args.toOwnedSlice());
     defer allocator.free(args_str);
-    return try std.fmt.allocPrint(std.heap.page_allocator, "[{s}]", .{args_str});
+    return try std.fmt.allocPrint(allocator, "[{s}]", .{args_str});
 }
 
 test "render effective address no displacement" {

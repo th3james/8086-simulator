@@ -42,21 +42,15 @@ pub fn decodeOpcode(inst: [2]u8) Opcode {
 
     switch (opcode_id) {
         opcode_masks.OpcodeId.movRegOrMemToFromReg => {
-            var displacement_size: DisplacementSize = DisplacementSize.none;
-            switch (options.mod) {
-                0b00 => {
-                    if (options.regOrMem == 0b110) {
-                        displacement_size = DisplacementSize.wide;
-                    }
-                },
-                0b01 => {
-                    displacement_size = DisplacementSize.narrow;
-                },
-                0b10 => {
-                    displacement_size = DisplacementSize.wide;
-                },
-                else => {},
-            }
+            const displacement_size = switch (options.mod) {
+                0b00 => if (options.regOrMem == 0b110)
+                    DisplacementSize.wide
+                else
+                    DisplacementSize.none,
+                0b01 => DisplacementSize.narrow,
+                0b10 => DisplacementSize.wide,
+                else => DisplacementSize.none,
+            };
             return Opcode{ .base = inst, .id = opcode_id, .options = options, .name = "mov", .displacement_size = displacement_size };
         },
         opcode_masks.OpcodeId.movImmediateToReg => {

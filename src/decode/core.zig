@@ -2,6 +2,7 @@ const std = @import("std");
 const mov = @import("mov.zig");
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
+const bit_utils = @import("bit_utils.zig");
 
 pub const DisplacementSize = enum {
     wide,
@@ -129,13 +130,6 @@ test "decodeOpcode - MOV Immediate to register wide" {
     try std.testing.expectEqual(DisplacementSize.narrow, result.displacement_size);
 }
 
-// TODO duplication
-fn concat_u8_to_u16(array: [2]u8) u16 {
-    var result: u16 = array[0];
-    result = result << 8;
-    return result | array[1];
-}
-
 pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displacement: [2]u8) !Instruction {
     var args = std.ArrayList([]const u8).init(allocator.*);
     defer args.deinit();
@@ -146,7 +140,7 @@ pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displace
                 0b00 => { // Memory mode, no displacement
                     if (opcode.options.regOrMem == 0b110) { // Direct address
                         try args.append(try allocator.dupe(u8, register_names.registerName(opcode.options.reg, opcode.options.wide)));
-                        const memory_address = concat_u8_to_u16(displacement);
+                        const memory_address = bit_utils.concat_u8_to_u16(displacement);
                         const memory_address_str = try std.fmt.allocPrint(allocator.*, "{}", .{memory_address});
                         try args.append(memory_address_str);
                     } else {
@@ -202,7 +196,7 @@ pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displace
             try args.append(try allocator.dupe(u8, register_names.registerName(opcode.options.reg, opcode.options.wide)));
 
             if (opcode.options.wide) {
-                const data_signed = concat_u8_to_u16([2]u8{
+                const data_signed = bit_utils.concat_u8_to_u16([2]u8{
                     displacement[0],
                     opcode.base[1],
                 });

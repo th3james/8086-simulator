@@ -1,11 +1,5 @@
 const std = @import("std");
-
-// TODO duplication
-fn concat_u8_to_u16(array: [2]u8) u16 {
-    var result: u16 = array[0];
-    result = result << 8;
-    return result | array[1];
-}
+const bit_utils = @import("bit_utils.zig");
 
 const RegisterName = struct {
     narrow: []const u8,
@@ -58,7 +52,7 @@ pub fn effectiveAddressRegisters(regOrMem: u3, mod: u2, displacement: [2]u8) Eff
             offset = @intCast(displacement[0]);
         },
         0b10 => {
-            offset = concat_u8_to_u16([2]u8{
+            offset = bit_utils.concat_u8_to_u16([2]u8{
                 displacement[1],
                 displacement[0],
             });

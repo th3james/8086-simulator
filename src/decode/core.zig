@@ -136,7 +136,7 @@ fn concat_u8_to_u16(array: [2]u8) u16 {
     return result | array[1];
 }
 
-pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8, allocator: *const std.mem.Allocator) !Instruction {
+pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8, allocator: *std.mem.Allocator) !Instruction {
     var args = std.ArrayList([]const u8).init(allocator.*);
     defer args.deinit();
 
@@ -223,7 +223,7 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8, allocator: *const 
 }
 
 test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
-    const allocator = std.testing.allocator;
+    var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b11000001 });
     const result = try decodeInstruction(opcode, [_]u8{ 0, 0 }, &allocator);
     defer result.deinit(&allocator);
@@ -233,7 +233,7 @@ test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
 }
 
 test "decodeInstruction - MOV Decode - Direct address move" {
-    const allocator = std.testing.allocator;
+    var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000110 });
     const result = try decodeInstruction(opcode, [_]u8{ 0b1, 0b1 }, &allocator);
     defer result.deinit(&allocator);
@@ -243,7 +243,7 @@ test "decodeInstruction - MOV Decode - Direct address move" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
-    const allocator = std.testing.allocator;
+    var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b00000110 });
     const result = try decodeInstruction(opcode, [_]u8{ 0b0, 0b0 }, &allocator);
     defer result.deinit(&allocator);
@@ -253,7 +253,7 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
-    const allocator = std.testing.allocator;
+    var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b11111010 });
     const result = try decodeInstruction(opcode, [_]u8{ 0b0, 0b0 }, &allocator);
     defer result.deinit(&allocator);
@@ -263,7 +263,7 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register wide" {
-    const allocator = std.testing.allocator;
+    var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10111001, 0b11111101 });
     const result = try decodeInstruction(opcode, [_]u8{ 0b11111111, 0b0 }, &allocator);
     defer result.deinit(&allocator);

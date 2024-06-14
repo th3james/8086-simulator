@@ -5,7 +5,7 @@ const InvalidBinaryErrors = error{MissingDisplacementError};
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
+    var allocator = gpa.allocator();
 
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -17,12 +17,13 @@ pub fn main() !void {
 
     const file_path = args[1];
 
+    try disassembleFile(file_path, &allocator);
+}
+
+fn disassembleFile(file_path: []const u8, allocator: *std.mem.Allocator) !void {
     const file = try std.fs.cwd().openFile(file_path, .{});
     defer file.close();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
@@ -52,10 +53,10 @@ pub fn main() !void {
             else => {},
         }
 
-        const instruction = try decode.decodeInstruction(opcode, displacement, &allocator);
-        defer instruction.deinit(&allocator);
+        const instruction = try decode.decodeInstruction(opcode, displacement, allocator);
+        defer instruction.deinit(allocator);
 
-        const args_str = try std.mem.join(allocator, ", ", instruction.args);
+        const args_str = try std.mem.join(allocator.*, ", ", instruction.args);
         defer allocator.free(args_str);
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }

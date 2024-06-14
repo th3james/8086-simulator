@@ -136,7 +136,7 @@ fn concat_u8_to_u16(array: [2]u8) u16 {
     return result | array[1];
 }
 
-pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8, allocator: *std.mem.Allocator) !Instruction {
+pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displacement: [2]u8) !Instruction {
     var args = std.ArrayList([]const u8).init(allocator.*);
     defer args.deinit();
 
@@ -225,7 +225,7 @@ pub fn decodeInstruction(opcode: Opcode, displacement: [2]u8, allocator: *std.me
 test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
     var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b11000001 });
-    const result = try decodeInstruction(opcode, [_]u8{ 0, 0 }, &allocator);
+    const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0, 0 });
     defer result.deinit(&allocator);
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
@@ -235,7 +235,7 @@ test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
 test "decodeInstruction - MOV Decode - Direct address move" {
     var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000110 });
-    const result = try decodeInstruction(opcode, [_]u8{ 0b1, 0b1 }, &allocator);
+    const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b1, 0b1 });
     defer result.deinit(&allocator);
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b0, false), result.args[0]);
@@ -245,7 +245,7 @@ test "decodeInstruction - MOV Decode - Direct address move" {
 test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
     var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b00000110 });
-    const result = try decodeInstruction(opcode, [_]u8{ 0b0, 0b0 }, &allocator);
+    const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b0, 0b0 });
     defer result.deinit(&allocator);
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
@@ -255,7 +255,7 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
 test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
     var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b11111010 });
-    const result = try decodeInstruction(opcode, [_]u8{ 0b0, 0b0 }, &allocator);
+    const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b0, 0b0 });
     defer result.deinit(&allocator);
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
@@ -265,7 +265,7 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
 test "decodeInstruction - MOV Decode - Immediate to register wide" {
     var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10111001, 0b11111101 });
-    const result = try decodeInstruction(opcode, [_]u8{ 0b11111111, 0b0 }, &allocator);
+    const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b11111111, 0b0 });
     defer result.deinit(&allocator);
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, true), result.args[0]);

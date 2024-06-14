@@ -17,10 +17,10 @@ pub fn main() !void {
 
     const file_path = args[1];
 
-    try disassembleFile(file_path, &allocator);
+    try disassembleFile(&allocator, file_path);
 }
 
-fn disassembleFile(file_path: []const u8, allocator: *std.mem.Allocator) !void {
+fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
     const file = try std.fs.cwd().openFile(file_path, .{});
     defer file.close();
 
@@ -53,7 +53,7 @@ fn disassembleFile(file_path: []const u8, allocator: *std.mem.Allocator) !void {
             else => {},
         }
 
-        const instruction = try decode.decodeInstruction(opcode, displacement, allocator);
+        const instruction = try decode.decodeInstruction(allocator, opcode, displacement);
         defer instruction.deinit(allocator);
 
         const args_str = try std.mem.join(allocator.*, ", ", instruction.args);

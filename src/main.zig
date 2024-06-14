@@ -4,8 +4,11 @@ const decode = @import("decode/core.zig");
 const InvalidBinaryErrors = error{MissingDisplacementError};
 
 pub fn main() !void {
-    const args = try std.process.argsAlloc(std.heap.page_allocator);
-    defer std.process.argsFree(std.heap.page_allocator, args);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
     if (args.len != 2) {
         std.debug.print("Usage: {s} <file_path>\n", .{args[0]});
@@ -49,11 +52,11 @@ pub fn main() !void {
             else => {},
         }
 
-        const instruction = try decode.decodeInstruction(opcode, displacement);
-        defer instruction.deinit(&std.heap.page_allocator);
+        const instruction = try decode.decodeInstruction(opcode, displacement, &allocator);
+        defer instruction.deinit(&allocator);
 
-        const args_str = try std.mem.join(std.heap.page_allocator, ", ", instruction.args);
-        defer std.heap.page_allocator.free(args_str);
+        const args_str = try std.mem.join(allocator, ", ", instruction.args);
+        defer allocator.free(args_str);
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }
 

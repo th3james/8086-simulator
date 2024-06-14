@@ -46,14 +46,15 @@ pub fn parseOptions(id: OpcodeId, instruction: [2]u8) OpcodeOptions {
     }
 }
 
-// zig fmt: off
 pub const OpcodeTable = [_]OpcodeMask{
     OpcodeMask{
         .id = OpcodeId.movRegOrMemToFromReg,
-        .identifier_mask = 0b11111100, .identifier = 0b10001000
+        .identifier_mask = 0b11111100,
+        .identifier = 0b10001000,
     },
     OpcodeMask{
         .id = OpcodeId.movImmediateToReg,
-        .identifier_mask = 0b11110000, .identifier = 0b10110000
-    }
+        .identifier_mask = 0b11110000,
+        .identifier = 0b10110000,
+    },
 };

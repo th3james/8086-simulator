@@ -43,10 +43,10 @@ const effectiveAddressRegisterMap = [_][2]Register{
     .{ Register.bx, Register.none },
 };
 
-const EffectiveAddress = struct { r1: Register, r2: Register, displacement: u16 };
+const EffectiveAddress = struct { r1: Register, r2: Register, displacement: i16 };
 // Table 4-10. R/M (Register/Memory) Field Encoding
 pub fn effectiveAddressRegisters(regOrMem: u3, mod: u2, displacement: [2]u8) EffectiveAddress {
-    var offset: u16 = 0;
+    var offset: i16 = 0;
     const names = effectiveAddressRegisterMap[regOrMem];
 
     switch (mod) {
@@ -54,10 +54,10 @@ pub fn effectiveAddressRegisters(regOrMem: u3, mod: u2, displacement: [2]u8) Eff
             offset = @intCast(displacement[0]);
         },
         0b10 => {
-            offset = bit_utils.concat_u8_to_u16([2]u8{
+            offset = @bitCast(bit_utils.concat_u8_to_u16([2]u8{
                 displacement[1],
                 displacement[0],
-            });
+            }));
         },
         else => {},
     }
@@ -85,22 +85,34 @@ test "effective address options 16-bit displacement" {
     try std.testing.expectEqual(258, result.displacement);
 }
 
+test "effective address options 16-bit negative displacement" {
+    const result = effectiveAddressRegisters(0b000, 0b10, [_]u8{ 0b11011011, 0b11111111 });
+    try std.testing.expectEqual(-37, result.displacement);
+}
+
 pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem.Allocator) ![]const u8 {
     var args = std.ArrayList([]const u8).init(allocator);
     defer args.deinit();
 
     try args.append(@tagName(effectiveAddress.r1));
     if (effectiveAddress.r2 != Register.none) {
+        try args.append(try allocator.dupe(u8, "+"));
         try args.append(@tagName(effectiveAddress.r2));
     }
 
-    if (effectiveAddress.displacement != 0) {
+    if (effectiveAddress.displacement > 0) {
+        try args.append(try allocator.dupe(u8, "+"));
         try args.append(
             try std.fmt.allocPrint(allocator, "{d}", .{effectiveAddress.displacement}),
         );
+    } else if (effectiveAddress.displacement < 0) {
+        try args.append(try allocator.dupe(u8, "-"));
+        try args.append(
+            try std.fmt.allocPrint(allocator, "{d}", .{@abs(effectiveAddress.displacement)}),
+        );
     }
 
-    const args_str = try std.mem.join(allocator, " + ", try args.toOwnedSlice());
+    const args_str = try std.mem.join(allocator, " ", try args.toOwnedSlice());
     defer allocator.free(args_str);
     return try std.fmt.allocPrint(allocator, "[{s}]", .{args_str});
 }
@@ -124,4 +136,11 @@ test "render effective address with displacement" {
     const result = try renderEffectiveAddress(input, std.heap.page_allocator);
     defer std.heap.page_allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si + 250]", result);
+}
+
+test "render effective address with negative displacement" {
+    const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = -37 };
+    const result = try renderEffectiveAddress(input, std.heap.page_allocator);
+    defer std.heap.page_allocator.free(result);
+    try std.testing.expectEqualStrings("[bx + si - 37]", result);
 }

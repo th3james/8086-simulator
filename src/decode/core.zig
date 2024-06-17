@@ -138,21 +138,7 @@ pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displace
                         const memory_address_str = try std.fmt.allocPrint(allocator.*, "{}", .{memory_address});
                         try args.append(memory_address_str);
                     } else {
-                        // TODO this is duplicated
-                        const effectiveAddress = register_names.effectiveAddressRegisters(opcode.options.regOrMem, opcode.options.mod, displacement);
-                        if (mov.regIsDestination(opcode.base)) {
-                            try args.append(try allocator.dupe(
-                                u8,
-                                register_names.registerName(opcode.options.reg, opcode.options.wide),
-                            ));
-                            try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
-                        } else {
-                            try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
-                            try args.append(try allocator.dupe(
-                                u8,
-                                register_names.registerName(opcode.options.reg, opcode.options.wide),
-                            ));
-                        }
+                        try appendEffectiveAddress(allocator, &args, opcode, displacement);
                     }
                 },
                 0b11 => { // Register to Register
@@ -167,21 +153,7 @@ pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displace
                     }
                 },
                 else => {
-                    // TODO this is duplicated
-                    const effectiveAddress = register_names.effectiveAddressRegisters(opcode.options.regOrMem, opcode.options.mod, displacement);
-                    if (mov.regIsDestination(opcode.base)) {
-                        try args.append(try allocator.dupe(
-                            u8,
-                            register_names.registerName(opcode.options.reg, opcode.options.wide),
-                        ));
-                        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
-                    } else {
-                        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
-                        try args.append(try allocator.dupe(
-                            u8,
-                            register_names.registerName(opcode.options.reg, opcode.options.wide),
-                        ));
-                    }
+                    try appendEffectiveAddress(allocator, &args, opcode, displacement);
                 },
             }
             return Instruction{ .args = try args.toOwnedSlice() };
@@ -207,6 +179,28 @@ pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displace
         opcode_masks.OpcodeId.unknown => {
             return Instruction{ .args = try args.toOwnedSlice() };
         },
+    }
+}
+
+fn appendEffectiveAddress(
+    allocator: *std.mem.Allocator,
+    args: *std.ArrayList([]const u8),
+    opcode: Opcode,
+    displacement: [2]u8,
+) !void {
+    const effectiveAddress = register_names.effectiveAddressRegisters(opcode.options.regOrMem, opcode.options.mod, displacement);
+    if (mov.regIsDestination(opcode.base)) {
+        try args.append(try allocator.dupe(
+            u8,
+            register_names.registerName(opcode.options.reg, opcode.options.wide),
+        ));
+        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
+    } else {
+        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
+        try args.append(try allocator.dupe(
+            u8,
+            register_names.registerName(opcode.options.reg, opcode.options.wide),
+        ));
     }
 }
 

@@ -53,6 +53,9 @@ pub fn decodeOpcode(inst: [2]u8) Opcode {
             };
             return Opcode{ .base = inst, .id = opcode_id, .options = options, .name = "mov", .displacement_size = displacement_size };
         },
+        opcode_masks.OpcodeId.movImmediateToRegOrMem => {
+            return Opcode{ .base = inst, .id = opcode_id, .options = options, .name = "mov", .displacement_size = DisplacementSize.none };
+        },
         opcode_masks.OpcodeId.movImmediateToReg => {
             var displacement_size: DisplacementSize = DisplacementSize.none;
 
@@ -156,6 +159,10 @@ pub fn decodeInstruction(allocator: *std.mem.Allocator, opcode: Opcode, displace
                     try appendEffectiveAddress(allocator, &args, opcode, displacement);
                 },
             }
+            return Instruction{ .args = try args.toOwnedSlice() };
+        },
+        opcode_masks.OpcodeId.movImmediateToRegOrMem => {
+            try args.append(try allocator.dupe(u8, "TODO Move Immediate To Register or Memory"));
             return Instruction{ .args = try args.toOwnedSlice() };
         },
         opcode_masks.OpcodeId.movImmediateToReg => {

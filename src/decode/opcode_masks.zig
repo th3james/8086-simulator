@@ -1,6 +1,7 @@
 pub const OpcodeId = enum {
     movRegOrMemToFromReg,
     movImmediateToReg,
+    movImmediateToRegOrMem,
     unknown,
 };
 
@@ -27,6 +28,14 @@ pub fn parseOptions(id: OpcodeId, instruction: [2]u8) OpcodeOptions {
                 .regOrMem = @intCast(instruction[1] & 0b00000111),
             };
         },
+        OpcodeId.movImmediateToRegOrMem => {
+            return OpcodeOptions{
+                .wide = false, // TODO
+                .mod = 0, // TODO
+                .reg = 0, // TODO
+                .regOrMem = 0, // TODO
+            };
+        },
         OpcodeId.movImmediateToReg => {
             return OpcodeOptions{
                 .wide = (instruction[0] & 0b00001000) != 0,
@@ -51,6 +60,11 @@ pub const OpcodeTable = [_]OpcodeMask{
         .id = OpcodeId.movRegOrMemToFromReg,
         .identifier_mask = 0b11111100,
         .identifier = 0b10001000,
+    },
+    OpcodeMask{
+        .id = OpcodeId.movImmediateToRegOrMem,
+        .identifier_mask = 0b11111110,
+        .identifier = 0b11000110,
     },
     OpcodeMask{
         .id = OpcodeId.movImmediateToReg,

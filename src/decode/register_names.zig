@@ -92,12 +92,17 @@ test "effective address options 16-bit negative displacement" {
 
 pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem.Allocator) ![]const u8 {
     var args = std.ArrayList([]const u8).init(allocator);
-    defer args.deinit();
+    defer {
+        for (args.items) |item| {
+            allocator.free(item);
+        }
+        args.deinit();
+    }
 
-    try args.append(@tagName(effectiveAddress.r1));
+    try args.append(try allocator.dupe(u8, @tagName(effectiveAddress.r1)));
     if (effectiveAddress.r2 != Register.none) {
         try args.append(try allocator.dupe(u8, "+"));
-        try args.append(@tagName(effectiveAddress.r2));
+        try args.append(try allocator.dupe(u8, @tagName(effectiveAddress.r2)));
     }
 
     if (effectiveAddress.displacement > 0) {
@@ -112,35 +117,39 @@ pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std
         );
     }
 
-    const args_str = try std.mem.join(allocator, " ", try args.toOwnedSlice());
+    const args_str = try std.mem.join(allocator, " ", args.items);
     defer allocator.free(args_str);
     return try std.fmt.allocPrint(allocator, "[{s}]", .{args_str});
 }
 
 test "render effective address no displacement" {
+    var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = 0 };
-    const result = try renderEffectiveAddress(input, std.heap.page_allocator);
-    defer std.heap.page_allocator.free(result);
+    const result = try renderEffectiveAddress(input, allocator);
+    defer allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si]", result);
 }
 
 test "render effective address ignore zero register" {
+    var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.si, .r2 = Register.none, .displacement = 0 };
-    const result = try renderEffectiveAddress(input, std.heap.page_allocator);
-    defer std.heap.page_allocator.free(result);
+    const result = try renderEffectiveAddress(input, allocator);
+    defer allocator.free(result);
     try std.testing.expectEqualStrings("[si]", result);
 }
 
 test "render effective address with displacement" {
+    var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = 250 };
-    const result = try renderEffectiveAddress(input, std.heap.page_allocator);
-    defer std.heap.page_allocator.free(result);
+    const result = try renderEffectiveAddress(input, allocator);
+    defer allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si + 250]", result);
 }
 
 test "render effective address with negative displacement" {
+    var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = -37 };
-    const result = try renderEffectiveAddress(input, std.heap.page_allocator);
-    defer std.heap.page_allocator.free(result);
+    const result = try renderEffectiveAddress(input, allocator);
+    defer allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si - 37]", result);
 }

@@ -231,6 +231,16 @@ test "decodeInstruction - MOV Decode - Direct address move" {
     try std.testing.expectEqualStrings("257", result.args[1]);
 }
 
+test "decodeInstruction - MOV reg or memory" {
+    var allocator = std.testing.allocator;
+    const opcode = decodeOpcode([_]u8{ 0b1000_1011, 0b0100_0001 });
+    const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b1101_1011, 0b0 });
+    defer result.deinit(&allocator);
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("ax", result.args[0]);
+    try std.testing.expectEqualStrings("[bx + di - 37]", result.args[1]);
+}
+
 test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
     var allocator = std.testing.allocator;
     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b00000110 });

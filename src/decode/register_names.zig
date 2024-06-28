@@ -51,7 +51,8 @@ pub fn effectiveAddressRegisters(regOrMem: u3, mod: u2, displacement: [2]u8) Eff
 
     switch (mod) {
         0b01 => {
-            offset = @intCast(displacement[0]);
+            const narrow_displacement: i8 = @bitCast(displacement[0]);
+            offset = @intCast(narrow_displacement);
         },
         0b10 => {
             offset = @bitCast(bit_utils.concat_u8_to_u16([2]u8{
@@ -78,6 +79,11 @@ test "effective address options 8-bit displacement" {
     try std.testing.expectEqual(1, result.displacement);
 }
 
+test "effective address options 8-bit negative displacement" {
+    const result = effectiveAddressRegisters(0b001, 0b01, [_]u8{ 0b11011011, 0b0 });
+    try std.testing.expectEqual(-37, result.displacement);
+}
+
 test "effective address options 16-bit displacement" {
     const result = effectiveAddressRegisters(0b000, 0b10, [_]u8{ 0b10, 0b1 });
     try std.testing.expectEqual(Register.bx, result.r1);
@@ -91,6 +97,7 @@ test "effective address options 16-bit negative displacement" {
 }
 
 pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem.Allocator) ![]const u8 {
+    // TODO this can be by optimised by reducing the number of allocations
     var args = std.ArrayList([]const u8).init(allocator);
     defer {
         for (args.items) |item| {

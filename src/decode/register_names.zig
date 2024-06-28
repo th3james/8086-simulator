@@ -46,22 +46,16 @@ const effectiveAddressRegisterMap = [_][2]Register{
 const EffectiveAddress = struct { r1: Register, r2: Register, displacement: i16 };
 // Table 4-10. R/M (Register/Memory) Field Encoding
 pub fn effectiveAddressRegisters(regOrMem: u3, mod: u2, displacement: [2]u8) EffectiveAddress {
-    var offset: i16 = 0;
     const names = effectiveAddressRegisterMap[regOrMem];
 
-    switch (mod) {
-        0b01 => {
-            const narrow_displacement: i8 = @bitCast(displacement[0]);
-            offset = @intCast(narrow_displacement);
-        },
-        0b10 => {
-            offset = @bitCast(bit_utils.concat_u8_to_u16([2]u8{
-                displacement[1],
-                displacement[0],
-            }));
-        },
-        else => {},
-    }
+    const offset: i16 = switch (mod) {
+        0b01 => @intCast(@as(i8, @bitCast(displacement[0]))),
+        0b10 => @bitCast(bit_utils.concat_u8_to_u16([2]u8{
+            displacement[1],
+            displacement[0],
+        })),
+        else => 0,
+    };
     return EffectiveAddress{ .r1 = names[0], .r2 = names[1], .displacement = offset };
 }
 

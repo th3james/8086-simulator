@@ -5,70 +5,75 @@ pub const OpcodeId = enum {
     unknown,
 };
 
-const OpcodeMask = struct {
-    identifier_mask: u8,
-    identifier: u8,
+const FieldDefinition = struct {
+    mask: u16,
+    shift: u4,
+};
+
+const OpcodeDefinition = struct {
     id: OpcodeId,
+    name: []const u8,
+    identifier_mask: u16,
+    identifier: u16,
+    bytes_required: u2,
+    wide: ?FieldDefinition = null,
+    mod: ?FieldDefinition = null,
+    reg: ?FieldDefinition = null,
+    regOrMem: ?FieldDefinition = null,
 };
 
-pub const OpcodeOptions = struct {
-    wide: bool,
-    mod: u2,
-    reg: u3,
-    regOrMem: u3,
+pub const DecodedOpcode = struct {
+    id: OpcodeId,
+    name: []const u8,
+    wide: ?bool = null,
+    mod: ?u2 = null,
+    reg: ?u3 = null,
+    regOrMem: ?u3 = null,
 };
 
-pub fn parseOptions(id: OpcodeId, instruction: [2]u8) OpcodeOptions {
-    switch (id) {
-        OpcodeId.movRegOrMemToFromReg => {
-            return OpcodeOptions{
-                .wide = (instruction[0] & 0b00000001) != 0,
-                .mod = @intCast((instruction[1] & 0b11000000) >> 6),
-                .reg = @intCast((instruction[1] & 0b00111000) >> 3),
-                .regOrMem = @intCast(instruction[1] & 0b00000111),
-            };
-        },
-        OpcodeId.movImmediateToRegOrMem => {
-            return OpcodeOptions{
-                .wide = false, // TODO
-                .mod = 0, // TODO
-                .reg = 0, // TODO
-                .regOrMem = 0, // TODO
-            };
-        },
-        OpcodeId.movImmediateToReg => {
-            return OpcodeOptions{
-                .wide = (instruction[0] & 0b00001000) != 0,
-                .mod = 0, // TODO
-                .reg = @intCast(instruction[0] & 0b00000111),
-                .regOrMem = 0, // TODO
-            };
-        },
-        OpcodeId.unknown => {
-            return OpcodeOptions{
-                .wide = false,
-                .mod = 0,
-                .reg = 0,
-                .regOrMem = 0,
-            };
-        },
-    }
-}
+pub const UnknownOpcode = DecodedOpcode{
+    .id = OpcodeId.unknown,
+    .name = "???",
+};
 
-pub const OpcodeTable = [_]OpcodeMask{
-    OpcodeMask{
+pub const OpcodeTable = [_]OpcodeDefinition{
+    .{
         .id = OpcodeId.movRegOrMemToFromReg,
-        .identifier_mask = 0b11111100,
-        .identifier = 0b10001000,
+        .name = "mov",
+        .identifier_mask = 0b1111_1100_0000_0000,
+        .identifier = 0b1000_1000_0000_0000,
+        .bytes_required = 2,
+        .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
+        .mod = .{ .mask = 0b0000_0000_1100_0000, .shift = 6 },
+        .reg = .{ .mask = 0b0000_0000_0011_1000, .shift = 3 },
+        .regOrMem = .{ .mask = 0b0000_0000_0000_0111, .shift = 0 },
     },
-    OpcodeMask{
+    .{
         .id = OpcodeId.movImmediateToRegOrMem,
-        .identifier_mask = 0b11111110,
-        .identifier = 0b11000110,
+        .name = "mov",
+        .identifier_mask = 0b1111_1110_0000_0000,
+        .identifier = 0b1100_0110_0000_0000,
+        .bytes_required = 2,
+        .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
+        .mod = .{ .mask = 0b0000_0000_1100_0000, .shift = 6 },
+        .regOrMem = .{ .mask = 0b0000_0000_0000_0111, .shift = 0 },
     },
-    OpcodeMask{
+    .{
         .id = OpcodeId.movImmediateToReg,
-        .identifier_mask = 0b11110000,
-        .identifier = 0b10110000,
+        .name = "mov",
+        .identifier_mask = 0b1111_0000_0000_0000,
+        .identifier = 0b1011_0000_0000_0000,
+        .bytes_required = 1,
+        .wide = .{ .mask = 0b0000_1000_0000_0000, .shift = 11 },
+        .reg = .{ .mask = 0b0000_0111_0000_0000, .shift = 8 },
     },
+};
+
+pub const InstructionField = struct {
+    start: u4,
+    end: u4,
+};
+
+pub const InstructionDataMap = struct {
+    displacement: ?InstructionField = null,
 };

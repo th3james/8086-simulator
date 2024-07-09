@@ -90,6 +90,7 @@ test "effective address options 16-bit negative displacement" {
     try std.testing.expectEqual(-37, result.displacement);
 }
 
+// TODO re-order arguments
 pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem.Allocator) ![]const u8 {
     // TODO this can be by optimised by reducing the number of allocations
     var args = std.ArrayList([]const u8).init(allocator);

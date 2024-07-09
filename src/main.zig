@@ -1,7 +1,7 @@
 const std = @import("std");
 const decode = @import("decode/core.zig");
 
-const InvalidBinaryErrors = error{MissingDisplacementError};
+const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -31,32 +31,63 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
     try stdout.print("; {s} disassembly\n", .{file_path});
     try stdout.print("bits 16\n", .{});
 
-    var buffer: [2]u8 = undefined;
+    const MAX_INSTRUCTION_SIZE = 6;
+    const MAX_OPCODE_LENGTH = 2;
+    var buffer: [1]u8 = undefined;
 
     while (true) {
-        const bytes_read = try file.read(&buffer);
-        if (bytes_read == 0) break;
+        var instruction_bytes: [MAX_INSTRUCTION_SIZE]u8 = [_]u8{0} ** MAX_INSTRUCTION_SIZE;
 
-        const opcode = decode.decodeOpcode(buffer);
-        var displacement: [2]u8 = .{ 0, 0 };
-        switch (opcode.displacement_size) {
-            decode.DisplacementSize.wide => {
-                const further_bytes_read = try file.read(&displacement);
-                if (further_bytes_read == 0) return InvalidBinaryErrors.MissingDisplacementError;
-            },
-            decode.DisplacementSize.narrow => {
-                var narrow_buffer: [1]u8 = undefined;
-                const further_bytes_read = try file.read(&narrow_buffer);
-                if (further_bytes_read == 0) return InvalidBinaryErrors.MissingDisplacementError;
-                displacement[0] = narrow_buffer[0];
-            },
-            else => {},
+        var opcode_length: u3 = 0;
+
+        while (opcode_length < MAX_OPCODE_LENGTH) {
+            const bytes_read = try file.read(&buffer);
+            if (bytes_read == 0) {
+                if (opcode_length == 0) {
+                    break; // end of file
+                } else {
+                    return InvalidBinaryErrors.IncompleteInstruction;
+                }
+            }
+
+            instruction_bytes[opcode_length] = buffer[0];
+            opcode_length += 1;
+
+            // if this errors, loop to read more bytes
+            _ = decode.decodeOpcode(instruction_bytes[0..opcode_length]) catch |err| switch (err) {
+                decode.Errors.InsufficientBytes => {
+                    continue;
+                },
+            };
+
+            break; // decode must have succeeded
         }
 
-        const instruction = try decode.decodeInstruction(allocator, opcode, displacement);
-        defer instruction.deinit(allocator);
+        const opcode = try decode.decodeOpcode(instruction_bytes[0..opcode_length]);
+        const data_map = decode.getInstructionDataMap(opcode);
+        const full_instruction_length = decode.getInstructionLength(data_map);
 
-        const args_str = try std.mem.join(allocator.*, ", ", instruction.args);
+        while (opcode_length < full_instruction_length) {
+            const bytes_read = try file.read(&buffer);
+            if (bytes_read == 0) {
+                if (opcode_length == 0) {
+                    break; // end of file
+                } else {
+                    return InvalidBinaryErrors.IncompleteInstruction;
+                }
+            }
+            instruction_bytes[opcode_length] = buffer[0];
+            opcode_length += 1;
+        }
+
+        const instruction_args = try decode.decodeArgs(allocator, .{
+            .base = instruction_bytes,
+            .opcode = opcode,
+            .data_map = data_map,
+        });
+        defer instruction_args.deinit(allocator);
+
+        const args_str = try std.mem.join(allocator.*, ", ", instruction_args.args);
         defer allocator.free(args_str);
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }

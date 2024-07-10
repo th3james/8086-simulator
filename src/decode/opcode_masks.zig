@@ -20,6 +20,7 @@ const OpcodeDefinition = struct {
     mod: ?FieldDefinition = null,
     reg: ?FieldDefinition = null,
     regOrMem: ?FieldDefinition = null,
+    regIsDestination: ?FieldDefinition = null,
 };
 
 pub const DecodedOpcode = struct {
@@ -29,6 +30,7 @@ pub const DecodedOpcode = struct {
     mod: ?u2 = null,
     reg: ?u3 = null,
     regOrMem: ?u3 = null,
+    regIsDestination: ?bool = null,
 };
 
 pub const UnknownOpcode = DecodedOpcode{
@@ -47,6 +49,7 @@ pub const OpcodeTable = [_]OpcodeDefinition{
         .mod = .{ .mask = 0b0000_0000_1100_0000, .shift = 6 },
         .reg = .{ .mask = 0b0000_0000_0011_1000, .shift = 3 },
         .regOrMem = .{ .mask = 0b0000_0000_0000_0111, .shift = 0 },
+        .regIsDestination = .{ .mask = 0b0000_0010_0000_0000, .shift = 9 },
     },
     .{
         .id = OpcodeId.movImmediateToRegOrMem,

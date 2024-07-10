@@ -10,10 +10,25 @@ pub const DisplacementSize = enum {
     none,
 };
 
+pub const InstructionErrors = error{NoDisplacement};
 const RawInstruction = struct {
     base: [6]u8,
     opcode: opcode_masks.DecodedOpcode,
     data_map: opcode_masks.InstructionDataMap,
+
+    pub fn getDisplacement(self: *const RawInstruction) InstructionErrors!i16 {
+        _ = self;
+        // TODO
+        // const offset: i16 = switch (mod) {
+        //     0b01 => @intCast(@as(i8, @bitCast(displacement[0]))),
+        //     0b10 => @bitCast(bit_utils.concat_u8_to_u16([2]u8{
+        //         displacement[1],
+        //         displacement[0],
+        //     })),
+        //     else => 0,
+        // };
+        return 0;
+    }
 };
 
 const InstructionArgs = struct {
@@ -213,11 +228,12 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
 
     switch (raw.opcode.id) {
         opcode_masks.OpcodeId.movRegOrMemToFromReg => {
-            switch (raw.opcode.mod) {
+            // TODO improve optional unwraps
+            switch (raw.opcode.mod.?) {
                 0b00 => { // Memory mode, no displacement
                     if (raw.opcode.regOrMem == 0b110) { // Direct address
-                        try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg, raw.opcode.wide)));
-                        const memory_address = bit_utils.concat_u8_to_u16(try raw.getDisplacement());
+                        try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
+                        const memory_address = try raw.getDisplacement();
                         const memory_address_str = try std.fmt.allocPrint(allocator.*, "{}", .{memory_address});
                         try args.append(memory_address_str);
                     } else {
@@ -230,9 +246,9 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
                     }
                 },
                 0b11 => { // Register to Register
-                    const regName = register_names.registerName(raw.opcode.reg, raw.opcode.wide);
-                    const regOrMemName = register_names.registerName(raw.opcode.regOrMem, raw.opcode.wide);
-                    if (mov.regIsDestination(raw.base[0..2])) {
+                    const regName = register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?);
+                    const regOrMemName = register_names.registerName(raw.opcode.regOrMem.?, raw.opcode.wide.?);
+                    if (raw.opcode.regIsDestination orelse false) {
                         try args.append(try allocator.dupe(u8, regName));
                         try args.append(try allocator.dupe(u8, regOrMemName));
                     } else {
@@ -256,12 +272,10 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
         opcode_masks.OpcodeId.movImmediateToReg => {
-            try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg, raw.opcode.wide)));
+            try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
 
-            if (raw.opcode.wide) {
-                const data_signed = bit_utils.concat_u8_to_u16(
-                    try raw.getDisplacement(),
-                );
+            if (raw.opcode.wide.?) {
+                const data_signed = try raw.getDisplacement();
                 const data: i16 = @bitCast(data_signed);
                 const data_str = try std.fmt.allocPrint(allocator.*, "{d}", .{data});
                 try args.append(data_str);
@@ -282,24 +296,23 @@ fn appendEffectiveAddress(
     allocator: *std.mem.Allocator,
     args: *std.ArrayList([]const u8),
     opcode: opcode_masks.DecodedOpcode,
-    displacement: [2]u8,
+    displacement: i16,
 ) !void {
     const effectiveAddress = register_names.effectiveAddressRegisters(
-        opcode.regOrMem,
-        opcode.options.mod,
+        opcode.regOrMem.?, // TODO can this unwrap be avoided?
         displacement,
     );
-    if (mov.regIsDestination(opcode.base)) {
+    if (opcode.regIsDestination orelse false) {
         try args.append(try allocator.dupe(
             u8,
-            register_names.registerName(opcode.reg, opcode.wide),
+            register_names.registerName(opcode.reg.?, opcode.wide.?),
         ));
         try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
     } else {
         try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
         try args.append(try allocator.dupe(
             u8,
-            register_names.registerName(opcode.options.reg, opcode.options.wide),
+            register_names.registerName(opcode.reg.?, opcode.wide.?),
         ));
     }
 }

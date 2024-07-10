@@ -54,32 +54,31 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
         else => @as(u16, bytes[0]) << 8 | bytes[1], // TODO may be wrong
     };
 
+    // TODO comptime loop?
     for (opcode_masks.OpcodeTable) |mask| {
-        if (mask.bytes_required <= bytes.len) {
-            if ((identifier & mask.identifier_mask) == mask.identifier) {
-                decoded_opcode = opcode_masks.DecodedOpcode{
-                    .id = mask.id,
-                    .name = mask.name,
-                };
+        if (mask.bytes_required > bytes.len) continue;
 
-                if (mask.wide) |wide| {
-                    decoded_opcode.wide = ((identifier & wide.mask) >> wide.shift) != 0;
+        if ((identifier & mask.identifier_mask) == mask.identifier) {
+            decoded_opcode = opcode_masks.DecodedOpcode{
+                .id = mask.id,
+                .name = mask.name,
+            };
+
+            inline for (comptime std.meta.fieldNames(opcode_masks.OpcodeDefinition)) |field| {
+                const def = @field(mask, field);
+                if (@TypeOf(def) == ?opcode_masks.FieldDefinition) {
+                    if (def) |field_def| {
+                        const value = (identifier & field_def.mask) >> field_def.shift;
+                        @field(decoded_opcode, field) = switch (@TypeOf(@field(decoded_opcode, field))) {
+                            ?bool => value != 0,
+                            ?u2, ?u3 => @intCast(value),
+                            else => @compileError("Unsupported field type for " ++ field),
+                        };
+                    }
                 }
-
-                if (mask.mod) |mod| {
-                    decoded_opcode.mod = @intCast((identifier & mod.mask) >> mod.shift);
-                }
-
-                if (mask.reg) |reg| {
-                    decoded_opcode.reg = @intCast((identifier & reg.mask) >> reg.shift);
-                }
-
-                if (mask.regOrMem) |regOrMem| {
-                    decoded_opcode.regOrMem = @intCast((identifier & regOrMem.mask) >> regOrMem.shift);
-                }
-
-                break;
             }
+
+            break;
         }
     }
     return decoded_opcode;

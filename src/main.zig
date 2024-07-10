@@ -44,7 +44,7 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
             const bytes_read = try file.read(&buffer);
             if (bytes_read == 0) {
                 if (opcode_length == 0) {
-                    break; // end of file
+                    break;
                 } else {
                     return InvalidBinaryErrors.IncompleteInstruction;
                 }
@@ -61,6 +61,10 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
             };
 
             break; // decode must have succeeded
+        }
+
+        if (opcode_length == 0) {
+            break; // EoF
         }
 
         const opcode = try decode.decodeOpcode(instruction_bytes[0..opcode_length]);
@@ -87,7 +91,6 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
             .data_map = data_map,
         };
 
-        std.debug.print("Parsing args for raw instruction {any}\n", .{raw_instruction});
         const instruction_args = try decode.decodeArgs(allocator, raw_instruction);
         defer instruction_args.deinit(allocator);
 

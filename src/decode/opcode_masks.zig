@@ -5,12 +5,12 @@ pub const OpcodeId = enum {
     unknown,
 };
 
-const FieldDefinition = struct {
+pub const FieldDefinition = struct {
     mask: u16,
     shift: u4,
 };
 
-const OpcodeDefinition = struct {
+pub const OpcodeDefinition = struct {
     id: OpcodeId,
     name: []const u8,
     identifier_mask: u16,

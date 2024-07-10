@@ -11,7 +11,7 @@ pub const DisplacementSize = enum {
 };
 
 pub const InstructionErrors = error{NoDisplacement};
-const RawInstruction = struct {
+pub const RawInstruction = struct {
     base: [6]u8,
     opcode: opcode_masks.DecodedOpcode,
     data_map: opcode_masks.InstructionDataMap,
@@ -44,48 +44,6 @@ const InstructionArgs = struct {
 
 pub const Errors = error{InsufficientBytes};
 
-// pub fn decodeOpcode(inst: []const u8) !Opcode {
-//     var opcode_id = opcode_masks.OpcodeId.unknown;
-//
-//     for (opcode_masks.OpcodeTable) |mask| {
-//         if ((inst[0] & mask.identifier_mask) == mask.identifier) {
-//             opcode_id = mask.id;
-//             break;
-//         }
-//     }
-//
-//     switch (opcode_id) {
-//         opcode_masks.OpcodeId.movRegOrMemToFromReg => {
-//             const displacement_size = switch (options.mod) {
-//                 0b00 => if (options.regOrMem == 0b110)
-//                     DisplacementSize.wide
-//                 else
-//                     DisplacementSize.none,
-//                 0b01 => DisplacementSize.narrow,
-//                 0b10 => DisplacementSize.wide,
-//                 else => DisplacementSize.none,
-//             };
-//             return Opcode{ .base = inst, .id = opcode_id, .options = options, .name = "mov", .displacement_size = displacement_size };
-//         },
-//         opcode_masks.OpcodeId.movImmediateToRegOrMem => {
-//             return Opcode{ .base = inst, .id = opcode_id, .optio{ns = options, .name = "mov", .displacement_size = DisplacementSize.none };
-//         },
-//         opcode_masks.OpcodeId.movImmediateToReg => {
-//             var displacement_size: DisplacementSize = DisplacementSize.none;
-//
-//             if (options.wide) {
-//                 displacement_size = DisplacementSize.narrow;
-//             }
-//
-//             return Opcode{ .base = inst, .id = opcode_id, .options = options, .name = "mov", .displacement_size = displacement_size };
-//         },
-//         opcode_masks.OpcodeId.unknown => {
-//             std.debug.print("unknown opcode: {b} {b}\n", .{ inst[0], inst[1] });
-//             return Opcode{ .base = inst, .id = opcode_id, .options = options, .name = "unknown", .displacement_size = DisplacementSize.none };
-//         },
-//     }
-// }
-
 pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
     var decoded_opcode = opcode_masks.UnknownOpcode;
 
@@ -93,7 +51,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
         1 => {
             return Errors.InsufficientBytes;
         },
-        else => @as(u16, bytes[0]) << 8 | bytes[1], // TODO this
+        else => @as(u16, bytes[0]) << 8 | bytes[1], // TODO may be wrong
     };
 
     for (opcode_masks.OpcodeTable) |mask| {
@@ -103,6 +61,22 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
                     .id = mask.id,
                     .name = mask.name,
                 };
+
+                if (mask.wide) |wide| {
+                    decoded_opcode.wide = ((identifier & wide.mask) >> wide.shift) != 0;
+                }
+
+                if (mask.mod) |mod| {
+                    decoded_opcode.mod = @intCast((identifier & mod.mask) >> mod.shift);
+                }
+
+                if (mask.reg) |reg| {
+                    decoded_opcode.reg = @intCast((identifier & reg.mask) >> reg.shift);
+                }
+
+                if (mask.regOrMem) |regOrMem| {
+                    decoded_opcode.regOrMem = @intCast((identifier & regOrMem.mask) >> regOrMem.shift);
+                }
 
                 break;
             }
@@ -126,6 +100,10 @@ test "decodeOpcode - MOV Memory mode, no displacement" {
     const result = try decodeOpcode(&[_]u8{ 0b1000_1000, 0b0000_0000 });
     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(false, result.wide.?);
+    try std.testing.expectEqual(0b00, result.mod.?);
+    try std.testing.expectEqual(0b000, result.reg.?);
+    try std.testing.expectEqual(0b000, result.regOrMem.?);
 }
 
 test "decodeOpcode - MOV Memory mode, direct address" {
@@ -133,21 +111,20 @@ test "decodeOpcode - MOV Memory mode, direct address" {
     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
 }
-//
-// test "decodeOpcode - Reg-to-reg MOV Decode" {
-//     const result = decodeOpcode([_]u8{ 0b10001000, 0b11000000 });
-//     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
-//     try std.testing.expectEqualStrings("mov", result.name);
-//     try std.testing.expectEqual(DisplacementSize.none, result.displacement_size);
-// }
-//
-// test "decodeOpcode - MOV Decode Memory mode 8-bit" {
-//     const result = decodeOpcode([_]u8{ 0b10001000, 0b01000000 });
-//     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
-//     try std.testing.expectEqualStrings("mov", result.name);
-//     try std.testing.expectEqual(DisplacementSize.narrow, result.displacement_size);
-// }
-//
+
+test "decodeOpcode - Reg-to-reg MOV Decode" {
+    const result = try decodeOpcode(&[_]u8{ 0b10001000, 0b11000000 });
+    try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+}
+
+test "decodeOpcode - MOV Decode Memory mode 8-bit" {
+    const result = try decodeOpcode(&[_]u8{ 0b10001000, 0b01000000 });
+    try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(0b01, result.mod.?);
+}
+
 // test "decodeOpcode - MOV Decode Memory mode 16-bit" {
 //     const result = decodeOpcode([_]u8{ 0b10001000, 0b10000000 });
 //     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
@@ -212,14 +189,50 @@ test "getInstructionDataMap - MOV Memory mode, direct address" {
     try std.testing.expectEqual(4, result.displacement.?.end);
 }
 
+test "getInstructionDataMap - Reg-to-reg MOV Decode" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movRegOrMemToFromReg,
+        .name = "mov",
+        .mod = 0b11,
+        .regOrMem = 0b110,
+    };
+    const result = getInstructionDataMap(decoded_opcode);
+    try std.testing.expectEqual(null, result.displacement);
+}
+
+test "getInstructionDataMap - MOV Decode Memory mode 8-bit" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movRegOrMemToFromReg,
+        .name = "mov",
+        .mod = 0b01,
+        .regOrMem = 0b000,
+    };
+    const result = getInstructionDataMap(decoded_opcode);
+    try std.testing.expectEqual(2, result.displacement.?.start);
+    try std.testing.expectEqual(3, result.displacement.?.end);
+}
+
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
-    _ = data_map;
-    return 0;
+    var length: u4 = 0;
+    if (data_map.displacement) |displacement| {
+        if (displacement.end > length) {
+            length = displacement.end;
+        }
+    }
+    return length;
 }
 
 test "getInstructionLength - returns 0 when there is no additional data" {
     const in = opcode_masks.InstructionDataMap{};
     try std.testing.expectEqual(0, getInstructionLength(in));
+}
+
+test "getInstructionLength - returns the end of displacement when specified" {
+    const in = opcode_masks.InstructionDataMap{ .displacement = .{
+        .start = 2,
+        .end = 3,
+    } };
+    try std.testing.expectEqual(3, getInstructionLength(in));
 }
 
 pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !InstructionArgs {

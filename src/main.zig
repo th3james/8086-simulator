@@ -72,7 +72,7 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
         const full_instruction_length = decode.getInstructionLength(data_map);
 
         while (opcode_length < full_instruction_length) {
-            try stdout.print("Reading more bytes\n", .{});
+            std.debug.print("Reading more bytes \n", .{});
             const bytes_read = try file.read(&buffer);
             if (bytes_read == 0) {
                 if (opcode_length == 0) {
@@ -91,11 +91,15 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
             .data_map = data_map,
         };
 
+        // std.debug.print("Input {b}\n", .{raw_instruction.base});
+        // std.debug.print("\t{any}\n", .{raw_instruction.opcode});
+        // std.debug.print("\t{any}\n", .{raw_instruction.data_map});
         const instruction_args = try decode.decodeArgs(allocator, raw_instruction);
         defer instruction_args.deinit(allocator);
 
         const args_str = try std.mem.join(allocator.*, ", ", instruction_args.args);
         defer allocator.free(args_str);
+        // std.debug.print("Result: {s} {s}\n", .{ opcode.name, args_str });
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }
 

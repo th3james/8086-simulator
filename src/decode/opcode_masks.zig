@@ -79,4 +79,5 @@ pub const InstructionField = struct {
 
 pub const InstructionDataMap = struct {
     displacement: ?InstructionField = null,
+    data: ?InstructionField = null,
 };

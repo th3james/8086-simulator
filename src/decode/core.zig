@@ -27,7 +27,15 @@ pub const RawInstruction = struct {
         //     })),
         //     else => 0,
         // };
-        return 0;
+        std.debug.print("TODO getDisplacement unimplemented\n", .{});
+        return 42;
+    }
+
+    pub fn getData(self: *const RawInstruction) InstructionErrors!i16 {
+        _ = self;
+        // TODO
+        std.debug.print("TODO getData unimplemented\n", .{});
+        return 42;
     }
 };
 
@@ -124,26 +132,25 @@ test "decodeOpcode - MOV Decode Memory mode 8-bit" {
     try std.testing.expectEqual(0b01, result.mod.?);
 }
 
-// test "decodeOpcode - MOV Decode Memory mode 16-bit" {
-//     const result = decodeOpcode([_]u8{ 0b10001000, 0b10000000 });
-//     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
-//     try std.testing.expectEqualStrings("mov", result.name);
-//     try std.testing.expectEqual(DisplacementSize.wide, result.displacement_size);
-// }
-//
-// test "decodeOpcode - MOV Immediate to register narrow" {
-//     const result = decodeOpcode([_]u8{ 0b10110001, 0b00000000 });
-//     try std.testing.expectEqual(opcode_masks.OpcodeId.movImmediateToReg, result.id);
-//     try std.testing.expectEqualStrings("mov", result.name);
-//     try std.testing.expectEqual(DisplacementSize.none, result.displacement_size);
-// }
-//
-// test "decodeOpcode - MOV Immediate to register wide" {
-//     const result = decodeOpcode([_]u8{ 0b10111000, 0b00000000 });
-//     try std.testing.expectEqual(opcode_masks.OpcodeId.movImmediateToReg, result.id);
-//     try std.testing.expectEqualStrings("mov", result.name);
-//     try std.testing.expectEqual(DisplacementSize.narrow, result.displacement_size);
-// }
+test "decodeOpcode - MOV Decode Memory mode 16-bit" {
+    const result = try decodeOpcode(&[_]u8{ 0b10001000, 0b10000000 });
+    try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+}
+
+test "decodeOpcode - MOV Immediate to register narrow" {
+    const result = try decodeOpcode(&[_]u8{ 0b10110001, 0b00000000 });
+    try std.testing.expectEqual(opcode_masks.OpcodeId.movImmediateToReg, result.id);
+    try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(false, result.wide.?);
+    try std.testing.expectEqual(0b001, result.reg.?);
+}
+
+test "decodeOpcode - MOV Immediate to register wide" {
+    const result = try decodeOpcode(&[_]u8{ 0b10111000, 0b00000000 });
+    try std.testing.expectEqual(opcode_masks.OpcodeId.movImmediateToReg, result.id);
+    try std.testing.expectEqual(true, result.wide.?);
+}
 
 pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_masks.InstructionDataMap {
     var result = opcode_masks.InstructionDataMap{};
@@ -161,7 +168,18 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                 };
             }
         },
-        else => {},
+        opcode_masks.OpcodeId.movImmediateToReg => {
+            result.data = .{
+                .start = 1,
+                .end = if (decoded_opcode.wide.?)
+                    2
+                else
+                    1,
+            };
+        },
+        else => {
+            std.debug.print("Got instruction {any} \n", .{decoded_opcode.id});
+        },
     }
     return result;
 }
@@ -211,13 +229,50 @@ test "getInstructionDataMap - MOV Decode Memory mode 8-bit" {
     try std.testing.expectEqual(3, result.displacement.?.end);
 }
 
+test "getInstructionDataMap - MOV Decode Memory mode 16-bit" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movRegOrMemToFromReg,
+        .name = "mov",
+        .mod = 0b10,
+    };
+    const result = getInstructionDataMap(decoded_opcode);
+    try std.testing.expectEqual(2, result.displacement.?.start);
+    try std.testing.expectEqual(4, result.displacement.?.end);
+}
+
+test "getInstructionDataMap - MOV Immediate to register narrow" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movImmediateToReg,
+        .name = "mov",
+        .wide = false,
+    };
+    const result = getInstructionDataMap(decoded_opcode);
+    try std.testing.expectEqual(1, result.data.?.start);
+    try std.testing.expectEqual(1, result.data.?.end);
+}
+
+test "getInstructionDataMap - MOV Immediate to register wide" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movImmediateToReg,
+        .name = "mov",
+        .wide = true,
+    };
+    const result = getInstructionDataMap(decoded_opcode);
+    try std.testing.expectEqual(1, result.data.?.start);
+    try std.testing.expectEqual(2, result.data.?.end);
+}
+
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
     var length: u4 = 0;
-    if (data_map.displacement) |displacement| {
-        if (displacement.end > length) {
-            length = displacement.end;
+
+    inline for (std.meta.fields(opcode_masks.InstructionDataMap)) |field| {
+        if (@field(data_map, field.name)) |value| {
+            if (@hasField(@TypeOf(value), "end")) {
+                length = @max(length, value.end);
+            }
         }
     }
+
     return length;
 }
 
@@ -231,6 +286,28 @@ test "getInstructionLength - returns the end of displacement when specified" {
         .start = 2,
         .end = 3,
     } };
+    try std.testing.expectEqual(3, getInstructionLength(in));
+}
+
+test "getInstructionLength - returns the end of data when specified" {
+    const in = opcode_masks.InstructionDataMap{ .data = .{
+        .start = 1,
+        .end = 2,
+    } };
+    try std.testing.expectEqual(2, getInstructionLength(in));
+}
+
+test "getInstructionLength - returns the maximum end value when multiple fields are specified" {
+    const in = opcode_masks.InstructionDataMap{
+        .displacement = .{
+            .start = 1,
+            .end = 3,
+        },
+        .data = .{
+            .start = 1,
+            .end = 2,
+        },
+    };
     try std.testing.expectEqual(3, getInstructionLength(in));
 }
 
@@ -287,7 +364,7 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
             try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
 
             if (raw.opcode.wide.?) {
-                const data_signed = try raw.getDisplacement();
+                const data_signed = try raw.getData();
                 const data: i16 = @bitCast(data_signed);
                 const data_str = try std.fmt.allocPrint(allocator.*, "{d}", .{data});
                 try args.append(data_str);

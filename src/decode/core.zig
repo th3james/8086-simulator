@@ -28,12 +28,12 @@ pub const RawInstruction = struct {
         const start = data.start;
         const end = data.end;
 
-        if (end - start == 0) {
+        if (end - start == 1) {
             // 8-bit data
             return @as(i16, self.base[start]);
-        } else if (end - start == 1) {
+        } else if (end - start == 2) {
             // 16-bit data (wide)
-            return @as(i16, @bitCast(@as(i16, self.base[end]) << 8 | @as(i16, self.base[start])));
+            return @as(i16, @bitCast(@as(i16, self.base[end - 1]) << 8 | @as(i16, self.base[start])));
         } else {
             return InstructionErrors.NoData;
         }
@@ -56,7 +56,7 @@ test "RawInstruction.getData - narrow" {
         .data_map = .{
             .data = .{
                 .start = 1,
-                .end = 1,
+                .end = 2,
             },
         },
     };
@@ -65,16 +65,16 @@ test "RawInstruction.getData - narrow" {
 
 test "RawInstruction.getData - wide" {
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 },
+        .base = [_]u8{ 0b10111001, 0b0, 0b1, 0, 0, 0 },
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
         .data_map = .{
             .data = .{
                 .start = 1,
-                .end = 2,
+                .end = 3,
             },
         },
     };
-    try std.testing.expectEqual(258, try in.getData());
+    try std.testing.expectEqual(256, try in.getData());
 }
 
 const InstructionArgs = struct {

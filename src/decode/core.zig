@@ -10,34 +10,72 @@ pub const DisplacementSize = enum {
     none,
 };
 
-pub const InstructionErrors = error{NoDisplacement};
+pub const InstructionErrors = error{ NoDisplacement, NoData };
 pub const RawInstruction = struct {
     base: [6]u8,
     opcode: opcode_masks.DecodedOpcode,
     data_map: opcode_masks.InstructionDataMap,
 
     pub fn getDisplacement(self: *const RawInstruction) InstructionErrors!i16 {
-        _ = self;
-        // TODO
-        // const offset: i16 = switch (mod) {
-        //     0b01 => @intCast(@as(i8, @bitCast(displacement[0]))),
-        //     0b10 => @bitCast(bit_utils.concat_u8_to_u16([2]u8{
-        //         displacement[1],
-        //         displacement[0],
-        //     })),
-        //     else => 0,
-        // };
         std.debug.print("TODO getDisplacement unimplemented\n", .{});
+        std.debug.print("\t{any}\n", .{self});
         return 42;
     }
 
     pub fn getData(self: *const RawInstruction) InstructionErrors!i16 {
-        _ = self;
-        // TODO
-        std.debug.print("TODO getData unimplemented\n", .{});
-        return 42;
+        const data = self.data_map.data orelse return InstructionErrors.NoData;
+
+        const start = data.start;
+        const end = data.end;
+
+        if (end - start == 0) {
+            // 8-bit data
+            return @as(i16, self.base[start]);
+        } else if (end - start == 1) {
+            // 16-bit data (wide)
+            return @as(i16, @bitCast(@as(i16, self.base[end]) << 8 | @as(i16, self.base[start])));
+        } else {
+            return InstructionErrors.NoData;
+        }
     }
 };
+
+test "RawInstruction.getData - errors when no data map" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{},
+    };
+    try std.testing.expectError(InstructionErrors.NoData, in.getData());
+}
+
+test "RawInstruction.getData - narrow" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{
+            .data = .{
+                .start = 1,
+                .end = 1,
+            },
+        },
+    };
+    try std.testing.expectEqual(2, try in.getData());
+}
+
+test "RawInstruction.getData - wide" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{
+            .data = .{
+                .start = 1,
+                .end = 2,
+            },
+        },
+    };
+    try std.testing.expectEqual(258, try in.getData());
+}
 
 const InstructionArgs = struct {
     args: []const []const u8,
@@ -53,13 +91,12 @@ const InstructionArgs = struct {
 pub const Errors = error{InsufficientBytes};
 
 pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
-    var decoded_opcode = opcode_masks.UnknownOpcode;
-
     const identifier: u16 = switch (bytes.len) {
-        1 => {
-            return Errors.InsufficientBytes;
+        1 => @as(u16, bytes[0]),
+        2 => @as(u16, bytes[0]) << 8 | bytes[1], // TODO may be wrong
+        else => {
+            return opcode_masks.UnknownOpcode;
         },
-        else => @as(u16, bytes[0]) << 8 | bytes[1], // TODO may be wrong
     };
 
     // TODO comptime loop?
@@ -67,7 +104,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
         if (mask.bytes_required > bytes.len) continue;
 
         if ((identifier & mask.identifier_mask) == mask.identifier) {
-            decoded_opcode = opcode_masks.DecodedOpcode{
+            var decoded_opcode = opcode_masks.DecodedOpcode{
                 .id = mask.id,
                 .name = mask.name,
             };
@@ -86,10 +123,14 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
                 }
             }
 
-            break;
+            return decoded_opcode;
         }
     }
-    return decoded_opcode;
+    if (bytes.len == 2) {
+        return opcode_masks.UnknownOpcode;
+    } else {
+        return Errors.InsufficientBytes;
+    }
 }
 
 test "decodeOpcode - Unknown opcode with one byte returns InsufficientBytes error" {
@@ -98,7 +139,7 @@ test "decodeOpcode - Unknown opcode with one byte returns InsufficientBytes erro
 }
 
 test "decodeOpcode - Unknown opcode with max bytes returns Unknown" {
-    const result = try decodeOpcode(&[_]u8{ 0b00000000, 0b0 });
+    const result = try decodeOpcode(&[_]u8{ 0, 0, 0 });
     try std.testing.expectEqual(opcode_masks.OpcodeId.unknown, result.id);
     try std.testing.expectEqualStrings("???", result.name);
 }
@@ -172,9 +213,9 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
             result.data = .{
                 .start = 1,
                 .end = if (decoded_opcode.wide.?)
-                    2
+                    3
                 else
-                    1,
+                    2,
             };
         },
         else => {
@@ -248,7 +289,7 @@ test "getInstructionDataMap - MOV Immediate to register narrow" {
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
-    try std.testing.expectEqual(1, result.data.?.end);
+    try std.testing.expectEqual(2, result.data.?.end);
 }
 
 test "getInstructionDataMap - MOV Immediate to register wide" {
@@ -259,7 +300,7 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
-    try std.testing.expectEqual(2, result.data.?.end);
+    try std.testing.expectEqual(3, result.data.?.end);
 }
 
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
@@ -376,6 +417,8 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
         opcode_masks.OpcodeId.unknown => {
+            const raw_bytes = try std.fmt.allocPrint(allocator.*, "{b}", .{raw.base});
+            try args.append(raw_bytes);
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
     }

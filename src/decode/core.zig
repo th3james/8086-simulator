@@ -2,7 +2,6 @@ const std = @import("std");
 const mov = @import("mov.zig");
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
-const bit_utils = @import("bit_utils.zig");
 
 pub const DisplacementSize = enum {
     wide,

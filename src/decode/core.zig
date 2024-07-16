@@ -264,8 +264,21 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                     2,
             };
         },
+        opcode_masks.OpcodeId.movImmediateToRegOrMem => {
+            result.displacement = .{
+                .start = 2,
+                .end = 4,
+            };
+            result.data = .{
+                .start = 4,
+                .end = if (decoded_opcode.wide.?)
+                    6
+                else
+                    5,
+            };
+        },
         else => {
-            std.debug.print("Got instruction {any} \n", .{decoded_opcode.id});
+            std.debug.print("TODO data_map not implemented for instruction {any} \n", .{decoded_opcode.id});
         },
     }
     return result;
@@ -347,6 +360,36 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
     try std.testing.expectEqual(3, result.data.?.end);
+}
+
+test "getInstructionDataMap - MOV Immediate to register/memory narrow" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movImmediateToRegOrMem,
+        .name = "mov",
+        .wide = false,
+    };
+
+    const result = getInstructionDataMap(decoded_opcode);
+
+    try std.testing.expectEqual(2, result.displacement.?.start);
+    try std.testing.expectEqual(4, result.displacement.?.end);
+    try std.testing.expectEqual(4, result.data.?.start);
+    try std.testing.expectEqual(5, result.data.?.end);
+}
+
+test "getInstructionDataMap - MOV Immediate to register/memory wide" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.movImmediateToRegOrMem,
+        .name = "mov",
+        .wide = true,
+    };
+
+    const result = getInstructionDataMap(decoded_opcode);
+
+    try std.testing.expectEqual(2, result.displacement.?.start);
+    try std.testing.expectEqual(4, result.displacement.?.end);
+    try std.testing.expectEqual(4, result.data.?.start);
+    try std.testing.expectEqual(6, result.data.?.end);
 }
 
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {

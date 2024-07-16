@@ -17,11 +17,22 @@ pub const RawInstruction = struct {
     data_map: opcode_masks.InstructionDataMap,
 
     pub fn getDisplacement(self: *const RawInstruction) InstructionErrors!i16 {
-        std.debug.print("TODO getDisplacement unimplemented\n", .{});
-        std.debug.print("\t{any}\n", .{self});
+        const displacement = self.data_map.displacement orelse return InstructionErrors.NoDisplacement;
+
+        const start = displacement.start;
+        const end = displacement.end;
+
+        if (end - start == 1) {
+            return @as(i16, self.base[start]);
+        } else if (end - start == 2) {
+            return @as(i16, @bitCast(@as(i16, self.base[end - 1]) << 8 | @as(i16, self.base[start])));
+        } else {
+            return InstructionErrors.NoData;
+        }
         return 42;
     }
 
+    // TODO loads of duplication
     pub fn getData(self: *const RawInstruction) InstructionErrors!i16 {
         const data = self.data_map.data orelse return InstructionErrors.NoData;
 
@@ -37,6 +48,43 @@ pub const RawInstruction = struct {
         }
     }
 };
+
+test "RawInstruction.getDisplacement - errors when no data map" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{},
+    };
+    try std.testing.expectError(InstructionErrors.NoDisplacement, in.getDisplacement());
+}
+
+test "RawInstruction.getDisplacement - narrow" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{
+            .displacement = .{
+                .start = 1,
+                .end = 2,
+            },
+        },
+    };
+    try std.testing.expectEqual(1, try in.getDisplacement());
+}
+
+test "RawInstruction.getDisplacement - wide" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{
+            .displacement = .{
+                .start = 1,
+                .end = 3,
+            },
+        },
+    };
+    try std.testing.expectEqual(256, try in.getDisplacement());
+}
 
 test "RawInstruction.getData - errors when no data map" {
     const in = RawInstruction{
@@ -369,7 +417,7 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
                             allocator,
                             &args,
                             raw.opcode,
-                            try raw.getDisplacement(),
+                            0,
                         );
                     }
                 },
@@ -471,15 +519,35 @@ test "decodeArgs - MOV Decode - Reg to Reg" {
     try std.testing.expectEqualStrings("al", result.args[1]);
 }
 
-// test "decodeInstruction - MOV Decode - Direct address move" {
-//     var allocator = std.testing.allocator;
-//     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000110 });
-//     const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b1, 0b1 });
-//     defer result.deinit(&allocator);
-//     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-//     try std.testing.expectEqualStrings(register_names.registerName(0b0, false), result.args[0]);
-//     try std.testing.expectEqualStrings("257", result.args[1]);
-// }
+test "decodeArgs - MOV Direct address" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b10001000, 0b00000110, 0b1, 0b1, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("al", result.args[0]);
+    try std.testing.expectEqualStrings("257", result.args[1]);
+}
+
+test "decodeArgs - MOV reg or memory" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b1000_1011, 0b0100_0001, 0b1101_1011, 0b0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("ax", result.args[0]);
+    try std.testing.expectEqualStrings("[bx + di - 37]", result.args[1]);
+}
 //
 // test "decodeInstruction - MOV reg or memory" {
 //     var allocator = std.testing.allocator;

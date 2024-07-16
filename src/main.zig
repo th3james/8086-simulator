@@ -72,7 +72,6 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
         const full_instruction_length = decode.getInstructionLength(data_map);
 
         while (opcode_length < full_instruction_length) {
-            std.debug.print("Reading more bytes \n", .{});
             const bytes_read = try file.read(&buffer);
             if (bytes_read == 0) {
                 if (opcode_length == 0) {

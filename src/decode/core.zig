@@ -3,41 +3,39 @@ const mov = @import("mov.zig");
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
 
-pub const InstructionErrors = error{ NoDisplacement, NoData };
+pub const InstructionErrors = error{ MissingField, UnhandledRange, NoDisplacement, NoData };
 pub const RawInstruction = struct {
     base: [6]u8,
     opcode: opcode_masks.DecodedOpcode,
     data_map: opcode_masks.InstructionDataMap,
 
-    pub fn getDisplacement(self: *const RawInstruction) InstructionErrors!i16 {
-        const displacement = self.data_map.displacement orelse return InstructionErrors.NoDisplacement;
+    fn extractValue(self: *const RawInstruction, field: ?opcode_masks.InstructionField) InstructionErrors!i16 {
+        const actual_field = field orelse return InstructionErrors.MissingField;
 
-        const start = displacement.start;
-        const end = displacement.end;
+        const start = actual_field.start;
+        const end = actual_field.end;
 
         if (end - start == 1) {
             return @as(i16, self.base[start]);
         } else if (end - start == 2) {
-            return @as(i16, @bitCast(@as(i16, self.base[end - 1]) << 8 | @as(i16, self.base[start])));
+            return @as(i16, @bitCast(@as(u16, self.base[end - 1]) << 8 | @as(u16, self.base[start])));
         } else {
-            return InstructionErrors.NoData;
+            return InstructionErrors.UnhandledRange;
         }
     }
 
-    // TODO loads of duplication
+    pub fn getDisplacement(self: *const RawInstruction) InstructionErrors!i16 {
+        return self.extractValue(self.data_map.displacement) catch |err| switch (err) {
+            InstructionErrors.MissingField => InstructionErrors.NoDisplacement,
+            else => err,
+        };
+    }
+
     pub fn getData(self: *const RawInstruction) InstructionErrors!i16 {
-        const data = self.data_map.data orelse return InstructionErrors.NoData;
-
-        const start = data.start;
-        const end = data.end;
-
-        if (end - start == 1) {
-            return @as(i16, self.base[start]);
-        } else if (end - start == 2) {
-            return @as(i16, @bitCast(@as(i16, self.base[end - 1]) << 8 | @as(i16, self.base[start])));
-        } else {
-            return InstructionErrors.NoData;
-        }
+        return self.extractValue(self.data_map.data) catch |err| switch (err) {
+            InstructionErrors.MissingField => InstructionErrors.NoData,
+            else => err,
+        };
     }
 };
 

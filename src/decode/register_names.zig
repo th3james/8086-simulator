@@ -52,34 +52,17 @@ pub fn effectiveAddressRegisters(regOrMem: u3, displacement: i16) EffectiveAddre
 }
 
 test "effective address options no displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b00, [_]u8{ 0b0, 0b0 });
+    const result = effectiveAddressRegisters(0b000, 0b00);
     try std.testing.expectEqual(Register.bx, result.r1);
     try std.testing.expectEqual(Register.si, result.r2);
     try std.testing.expectEqual(0, result.displacement);
 }
 
 test "effective address options 8-bit displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b01, [_]u8{ 0b1, 0b0 });
+    const result = effectiveAddressRegisters(0b000, 0b01);
     try std.testing.expectEqual(Register.bx, result.r1);
     try std.testing.expectEqual(Register.si, result.r2);
     try std.testing.expectEqual(1, result.displacement);
-}
-
-test "effective address options 8-bit negative displacement" {
-    const result = effectiveAddressRegisters(0b001, 0b01, [_]u8{ 0b11011011, 0b0 });
-    try std.testing.expectEqual(-37, result.displacement);
-}
-
-test "effective address options 16-bit displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b10, [_]u8{ 0b10, 0b1 });
-    try std.testing.expectEqual(Register.bx, result.r1);
-    try std.testing.expectEqual(Register.si, result.r2);
-    try std.testing.expectEqual(258, result.displacement);
-}
-
-test "effective address options 16-bit negative displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b10, [_]u8{ 0b11011011, 0b11111111 });
-    try std.testing.expectEqual(-37, result.displacement);
 }
 
 // TODO re-order arguments

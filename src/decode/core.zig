@@ -29,10 +29,8 @@ pub const RawInstruction = struct {
         const end = data.end;
 
         if (end - start == 1) {
-            // 8-bit data
             return @as(i16, self.base[start]);
         } else if (end - start == 2) {
-            // 16-bit data (wide)
             return @as(i16, @bitCast(@as(i16, self.base[end - 1]) << 8 | @as(i16, self.base[start])));
         } else {
             return InstructionErrors.NoData;
@@ -449,16 +447,30 @@ fn appendEffectiveAddress(
     }
 }
 
-// test "decodeInstruction - MOV Decode - Reg to Reg permutations" {
-//     var allocator = std.testing.allocator;
-//     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b11000001 });
-//     const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0, 0 });
-//     defer result.deinit(&allocator);
-//     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-//     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
-//     try std.testing.expectEqualStrings(register_names.registerName(0b0, false), result.args[1]);
-// }
-//
+fn buildRawInstructionFromBytes(bytes: [6]u8, length: u4) !RawInstruction {
+    const opcode = try decodeOpcode(bytes[0..length]);
+    return RawInstruction{
+        .base = bytes,
+        .opcode = opcode,
+        .data_map = getInstructionDataMap(opcode),
+    };
+}
+
+test "decodeArgs - MOV Decode - Reg to Reg" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b10001000, 0b11000001, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("cl", result.args[0]);
+    try std.testing.expectEqualStrings("al", result.args[1]);
+}
+
 // test "decodeInstruction - MOV Decode - Direct address move" {
 //     var allocator = std.testing.allocator;
 //     const opcode = decodeOpcode([_]u8{ 0b10001000, 0b00000110 });

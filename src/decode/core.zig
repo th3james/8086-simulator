@@ -3,12 +3,6 @@ const mov = @import("mov.zig");
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
 
-pub const DisplacementSize = enum {
-    wide,
-    narrow,
-    none,
-};
-
 pub const InstructionErrors = error{ NoDisplacement, NoData };
 pub const RawInstruction = struct {
     base: [6]u8,
@@ -28,7 +22,6 @@ pub const RawInstruction = struct {
         } else {
             return InstructionErrors.NoData;
         }
-        return 42;
     }
 
     // TODO loads of duplication

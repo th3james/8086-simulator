@@ -548,43 +548,63 @@ test "decodeArgs - MOV reg or memory" {
     try std.testing.expectEqualStrings("ax", result.args[0]);
     try std.testing.expectEqualStrings("[bx + di - 37]", result.args[1]);
 }
-//
-// test "decodeInstruction - MOV reg or memory" {
-//     var allocator = std.testing.allocator;
-//     const opcode = decodeOpcode([_]u8{ 0b1000_1011, 0b0100_0001 });
-//     const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b1101_1011, 0b0 });
-//     defer result.deinit(&allocator);
-//     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-//     try std.testing.expectEqualStrings("ax", result.args[0]);
-//     try std.testing.expectEqualStrings("[bx + di - 37]", result.args[1]);
-// }
-//
-// test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
-//     var allocator = std.testing.allocator;
-//     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b00000110 });
-//     const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b0, 0b0 });
-//     defer result.deinit(&allocator);
-//     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-//     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
-//     try std.testing.expectEqualStrings("6", result.args[1]);
-// }
-//
-// test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
-//     var allocator = std.testing.allocator;
-//     const opcode = decodeOpcode([_]u8{ 0b10110001, 0b11111010 });
-//     const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b0, 0b0 });
-//     defer result.deinit(&allocator);
-//     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-//     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
-//     try std.testing.expectEqualStrings("-6", result.args[1]);
-// }
-//
-// test "decodeInstruction - MOV Decode - Immediate to register wide" {
-//     var allocator = std.testing.allocator;
-//     const opcode = decodeOpcode([_]u8{ 0b10111001, 0b11111101 });
-//     const result = try decodeInstruction(&allocator, opcode, [_]u8{ 0b11111111, 0b0 });
-//     defer result.deinit(&allocator);
-//     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-//     try std.testing.expectEqualStrings(register_names.registerName(0b1, true), result.args[0]);
-//     try std.testing.expectEqualStrings("-3", result.args[1]);
-// }
+
+test "decodeArgs - MOV Decode - Immediate to register narrow positive" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
+    try std.testing.expectEqualStrings("6", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
+    try std.testing.expectEqualStrings("6", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b10110001, 0b11111010, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
+    try std.testing.expectEqualStrings("-6", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register wide" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b10111001, 0b11111101, 0b11111111, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings(register_names.registerName(0b1, true), result.args[0]);
+    try std.testing.expectEqualStrings("-3", result.args[1]);
+}

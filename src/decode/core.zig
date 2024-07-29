@@ -457,7 +457,7 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
                     if (raw.opcode.regOrMem == 0b110) { // Direct address
                         try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
                         const memory_address = try raw.getDisplacement();
-                        const memory_address_str = try std.fmt.allocPrint(allocator.*, "{}", .{memory_address});
+                        const memory_address_str = try std.fmt.allocPrint(allocator.*, "[{}]", .{memory_address});
                         try args.append(memory_address_str);
                     } else {
                         try appendEffectiveAddress(
@@ -512,8 +512,6 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
                 immediate,
             });
             try args.append(immediate_str);
-            std.debug.print("\t{b}\n", .{raw.base});
-            std.debug.print("\t{any}\n", .{raw.data_map});
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
@@ -602,7 +600,7 @@ test "decodeArgs - MOV Direct address" {
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("al", result.args[0]);
-    try std.testing.expectEqualStrings("257", result.args[1]);
+    try std.testing.expectEqualStrings("[257]", result.args[1]);
 }
 
 test "decodeArgs - MOV reg or memory" {

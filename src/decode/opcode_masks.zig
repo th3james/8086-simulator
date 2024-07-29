@@ -2,6 +2,8 @@ pub const OpcodeId = enum {
     movRegOrMemToFromReg,
     movImmediateToReg,
     movImmediateToRegOrMem,
+    memoryToAccumulator,
+    accumulatorToMemory,
     unknown,
 };
 
@@ -69,6 +71,22 @@ pub const OpcodeTable = [_]OpcodeDefinition{
         .bytes_required = 1,
         .wide = .{ .mask = 0b0000_1000_0000_0000, .shift = 11 },
         .reg = .{ .mask = 0b0000_0111_0000_0000, .shift = 8 },
+    },
+    .{
+        .id = OpcodeId.memoryToAccumulator,
+        .name = "mov",
+        .identifier_mask = 0b1111_1110_0000_0000,
+        .identifier = 0b1010_0000_0000_0000,
+        .bytes_required = 1,
+        .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
+    },
+    .{
+        .id = OpcodeId.accumulatorToMemory,
+        .name = "mov",
+        .identifier_mask = 0b1111_1110_0000_0000,
+        .identifier = 0b1010_0010_0000_0000,
+        .bytes_required = 1,
+        .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
     },
 };
 

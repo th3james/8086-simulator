@@ -493,7 +493,6 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
 
         opcode_masks.OpcodeId.movImmediateToRegOrMem => {
             const effectiveAddress = register_names.effectiveAddressRegisters(
-                raw.opcode.mod.?, // TODO can this unwrap be avoided?
                 raw.opcode.regOrMem.?, // TODO can this unwrap be avoided?
                 raw.getDisplacement() catch |err| switch (err) {
                     InstructionErrors.NoDisplacement => 0,
@@ -549,7 +548,6 @@ fn appendEffectiveAddress(
     displacement: i16,
 ) !void {
     const effectiveAddress = register_names.effectiveAddressRegisters(
-        opcode.mod.?, // TODO can this unwrap be avoided?
         opcode.regOrMem.?, // TODO can this unwrap be avoided?
         displacement,
     );

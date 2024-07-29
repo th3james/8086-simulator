@@ -44,24 +44,43 @@ const effectiveAddressRegisterMap = [_][2]Register{
 
 const EffectiveAddress = struct { r1: Register, r2: Register, displacement: i16 };
 // Table 4-10. R/M (Register/Memory) Field Encoding
-pub fn effectiveAddressRegisters(regOrMem: u3, displacement: i16) EffectiveAddress {
+pub fn effectiveAddressRegisters(mod: u2, regOrMem: u3, displacement: i16) EffectiveAddress {
+    // TODO is mod unnecessary
     const names = effectiveAddressRegisterMap[regOrMem];
 
-    return EffectiveAddress{ .r1 = names[0], .r2 = names[1], .displacement = displacement };
+    if (mod > 0) {
+        return EffectiveAddress{ .r1 = names[0], .r2 = names[1], .displacement = displacement };
+    } else {
+        return EffectiveAddress{ .r1 = names[0], .r2 = names[1], .displacement = 0 };
+    }
 }
 
 test "effective address options no displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b00);
+    const result = effectiveAddressRegisters(0b00, 0b000, 0);
+    try std.testing.expectEqual(Register.bx, result.r1);
+    try std.testing.expectEqual(Register.si, result.r2);
+    try std.testing.expectEqual(0, result.displacement);
+}
+
+test "effective address options discarded displacement" {
+    const result = effectiveAddressRegisters(0b00, 0b000, 5);
     try std.testing.expectEqual(Register.bx, result.r1);
     try std.testing.expectEqual(Register.si, result.r2);
     try std.testing.expectEqual(0, result.displacement);
 }
 
 test "effective address options 8-bit displacement" {
-    const result = effectiveAddressRegisters(0b000, 0b01);
+    const result = effectiveAddressRegisters(0b01, 0b000, 1);
     try std.testing.expectEqual(Register.bx, result.r1);
     try std.testing.expectEqual(Register.si, result.r2);
     try std.testing.expectEqual(1, result.displacement);
+}
+
+test "effective address options 16-bit displacement" {
+    const result = effectiveAddressRegisters(0b01, 0b000, 2303);
+    try std.testing.expectEqual(Register.bx, result.r1);
+    try std.testing.expectEqual(Register.si, result.r2);
+    try std.testing.expectEqual(2303, result.displacement);
 }
 
 // TODO re-order arguments

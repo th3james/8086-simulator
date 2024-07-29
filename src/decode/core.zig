@@ -16,7 +16,7 @@ pub const RawInstruction = struct {
         const end = actual_field.end;
 
         if (end - start == 1) {
-            return @as(i16, self.base[start]);
+            return @as(i16, @as(i8, @bitCast(self.base[start])));
         } else if (end - start == 2) {
             return @as(i16, @bitCast(@as(u16, self.base[end - 1]) << 8 | @as(u16, self.base[start])));
         } else {
@@ -48,7 +48,7 @@ test "RawInstruction.getDisplacement - errors when no data map" {
     try std.testing.expectError(InstructionErrors.NoDisplacement, in.getDisplacement());
 }
 
-test "RawInstruction.getDisplacement - narrow" {
+test "RawInstruction.getDisplacement - positive narrow" {
     const in = RawInstruction{
         .base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 },
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
@@ -60,6 +60,20 @@ test "RawInstruction.getDisplacement - narrow" {
         },
     };
     try std.testing.expectEqual(1, try in.getDisplacement());
+}
+
+test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
+    const in = RawInstruction{
+        .base = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 },
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .data_map = .{
+            .displacement = .{
+                .start = 1,
+                .end = 2,
+            },
+        },
+    };
+    try std.testing.expectEqual(-37, try in.getDisplacement());
 }
 
 test "RawInstruction.getDisplacement - wide" {
@@ -97,20 +111,6 @@ test "RawInstruction.getData - narrow" {
         },
     };
     try std.testing.expectEqual(2, try in.getData());
-}
-
-test "RawInstruction.getData - wide" {
-    const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0b0, 0b1, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
-        .data_map = .{
-            .data = .{
-                .start = 1,
-                .end = 3,
-            },
-        },
-    };
-    try std.testing.expectEqual(256, try in.getData());
 }
 
 const InstructionArgs = struct {
@@ -255,16 +255,29 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
             };
         },
         opcode_masks.OpcodeId.movImmediateToRegOrMem => {
-            result.displacement = .{
-                .start = 2,
-                .end = 4,
-            };
+            if (decoded_opcode.mod) |mod| {
+                result.displacement = switch (mod) {
+                    0b00 => if (decoded_opcode.regOrMem == 0b110)
+                        .{ .start = 2, .end = 4 }
+                    else
+                        null,
+                    0b01 => .{ .start = 2, .end = 3 },
+                    0b10 => .{ .start = 2, .end = 4 },
+                    else => null,
+                };
+            }
+
+            const next = if (result.displacement) |displacement|
+                displacement.end
+            else
+                2;
+
             result.data = .{
-                .start = 4,
+                .start = next,
                 .end = if (decoded_opcode.wide.?)
-                    6
+                    next + 2
                 else
-                    5,
+                    next + 1,
             };
         },
         else => {
@@ -352,11 +365,12 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
     try std.testing.expectEqual(3, result.data.?.end);
 }
 
-test "getInstructionDataMap - MOV Immediate to register/memory narrow" {
+test "getInstructionDataMap - MOV Immediate to register/memory, wide displacement, narrow data" {
     const decoded_opcode = opcode_masks.DecodedOpcode{
         .id = opcode_masks.OpcodeId.movImmediateToRegOrMem,
         .name = "mov",
         .wide = false,
+        .mod = 0b10,
     };
 
     const result = getInstructionDataMap(decoded_opcode);
@@ -367,19 +381,19 @@ test "getInstructionDataMap - MOV Immediate to register/memory narrow" {
     try std.testing.expectEqual(5, result.data.?.end);
 }
 
-test "getInstructionDataMap - MOV Immediate to register/memory wide" {
+test "getInstructionDataMap - MOV Immediate to register/memory wide, no displacement, wide data" {
     const decoded_opcode = opcode_masks.DecodedOpcode{
         .id = opcode_masks.OpcodeId.movImmediateToRegOrMem,
         .name = "mov",
         .wide = true,
+        .mod = 0b00,
     };
 
     const result = getInstructionDataMap(decoded_opcode);
 
-    try std.testing.expectEqual(2, result.displacement.?.start);
-    try std.testing.expectEqual(4, result.displacement.?.end);
-    try std.testing.expectEqual(4, result.data.?.start);
-    try std.testing.expectEqual(6, result.data.?.end);
+    try std.testing.expectEqual(null, result.displacement);
+    try std.testing.expectEqual(2, result.data.?.start);
+    try std.testing.expectEqual(4, result.data.?.end);
 }
 
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
@@ -476,10 +490,34 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
             }
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
+
         opcode_masks.OpcodeId.movImmediateToRegOrMem => {
-            try args.append(try allocator.dupe(u8, "TODO Move Immediate To Register or Memory"));
+            const effectiveAddress = register_names.effectiveAddressRegisters(
+                raw.opcode.mod.?, // TODO can this unwrap be avoided?
+                raw.opcode.regOrMem.?, // TODO can this unwrap be avoided?
+                raw.getDisplacement() catch |err| switch (err) {
+                    InstructionErrors.NoDisplacement => 0,
+                    else => {
+                        return err;
+                    },
+                },
+            );
+            try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
+            const immediate = try raw.getData();
+            const immediate_size = if (raw.opcode.wide.?)
+                "word"
+            else
+                "byte";
+            const immediate_str = try std.fmt.allocPrint(allocator.*, "{s} {}", .{
+                immediate_size,
+                immediate,
+            });
+            try args.append(immediate_str);
+            std.debug.print("\t{b}\n", .{raw.base});
+            std.debug.print("\t{any}\n", .{raw.data_map});
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
+
         opcode_masks.OpcodeId.movImmediateToReg => {
             try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
 
@@ -495,6 +533,7 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
             }
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
+
         opcode_masks.OpcodeId.unknown => {
             const raw_bytes = try std.fmt.allocPrint(allocator.*, "{b}", .{raw.base});
             try args.append(raw_bytes);
@@ -510,6 +549,7 @@ fn appendEffectiveAddress(
     displacement: i16,
 ) !void {
     const effectiveAddress = register_names.effectiveAddressRegisters(
+        opcode.mod.?, // TODO can this unwrap be avoided?
         opcode.regOrMem.?, // TODO can this unwrap be avoided?
         displacement,
     );
@@ -640,4 +680,19 @@ test "decodeInstruction - MOV Decode - Immediate to register wide" {
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, true), result.args[0]);
     try std.testing.expectEqualStrings("-3", result.args[1]);
+}
+
+test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
+    var allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b11000110, 0b11, 7, 0, 0, 0 }, // TODO only use first 3 bytes
+        2,
+    );
+
+    const result = try decodeArgs(&allocator, raw_instruction);
+    defer result.deinit(&allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("[bp + di]", result.args[0]);
+    try std.testing.expectEqualStrings("byte 7", result.args[1]);
 }

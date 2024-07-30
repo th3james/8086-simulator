@@ -71,40 +71,46 @@ test "effective address options 8-bit displacement" {
     try std.testing.expectEqual(1, result.displacement);
 }
 
+fn writeEffectiveAddress(
+    writer: anytype,
+    effectiveAddress: EffectiveAddress,
+) !void {
+    try writer.writeAll("[");
+    try writer.writeAll(@tagName(effectiveAddress.r1));
+
+    if (effectiveAddress.r2 != Register.none) {
+        try writer.writeAll(" + ");
+        try writer.writeAll(@tagName(effectiveAddress.r2));
+    }
+
+    if (effectiveAddress.displacement != 0) {
+        if (effectiveAddress.displacement > 0) {
+            try writer.writeAll(" + ");
+        } else {
+            try writer.writeAll(" - ");
+        }
+        try std.fmt.formatInt(
+            @abs(effectiveAddress.displacement),
+            10,
+            .lower,
+            .{},
+            writer,
+        );
+    }
+    try writer.writeAll("]");
+}
+
+const MIN_EFFECTIVE_ADDR_LEN = 4; // [ax] is smallest possible string
 pub fn renderEffectiveAddress(
     allocator: std.mem.Allocator,
     effectiveAddress: EffectiveAddress,
 ) ![]const u8 {
-    // TODO this can be by optimised by reducing the number of allocations
-    var args = std.ArrayList([]const u8).init(allocator);
-    defer {
-        for (args.items) |item| {
-            allocator.free(item);
-        }
-        args.deinit();
-    }
+    var result_buffer = try std.ArrayList(u8).initCapacity(allocator, MIN_EFFECTIVE_ADDR_LEN);
+    errdefer result_buffer.deinit();
 
-    try args.append(try allocator.dupe(u8, @tagName(effectiveAddress.r1)));
-    if (effectiveAddress.r2 != Register.none) {
-        try args.append(try allocator.dupe(u8, "+"));
-        try args.append(try allocator.dupe(u8, @tagName(effectiveAddress.r2)));
-    }
+    try writeEffectiveAddress(result_buffer.writer(), effectiveAddress);
 
-    if (effectiveAddress.displacement > 0) {
-        try args.append(try allocator.dupe(u8, "+"));
-        try args.append(
-            try std.fmt.allocPrint(allocator, "{d}", .{effectiveAddress.displacement}),
-        );
-    } else if (effectiveAddress.displacement < 0) {
-        try args.append(try allocator.dupe(u8, "-"));
-        try args.append(
-            try std.fmt.allocPrint(allocator, "{d}", .{@abs(effectiveAddress.displacement)}),
-        );
-    }
-
-    const args_str = try std.mem.join(allocator, " ", args.items);
-    defer allocator.free(args_str);
-    return try std.fmt.allocPrint(allocator, "[{s}]", .{args_str});
+    return result_buffer.toOwnedSlice();
 }
 
 test "render effective address no displacement" {

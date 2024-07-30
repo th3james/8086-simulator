@@ -9,33 +9,24 @@ pub const RawInstruction = struct {
     opcode: opcode_masks.DecodedOpcode,
     data_map: opcode_masks.InstructionDataMap,
 
-    fn extractValue(self: *const RawInstruction, field: ?opcode_masks.InstructionField) InstructionErrors!i16 {
-        const actual_field = field orelse return InstructionErrors.MissingField;
-
-        const start = actual_field.start;
-        const end = actual_field.end;
-
-        if (end - start == 1) {
-            return @as(i16, @as(i8, @bitCast(self.base[start])));
-        } else if (end - start == 2) {
-            return @as(i16, @bitCast(@as(u16, self.base[end - 1]) << 8 | @as(u16, self.base[start])));
+    fn extractValue(self: *const RawInstruction, field: opcode_masks.InstructionField) InstructionErrors!i16 {
+        if (field.end - field.start == 1) {
+            return @as(i16, @as(i8, @bitCast(self.base[field.start])));
+        } else if (field.end - field.start == 2) {
+            return @as(i16, @bitCast(@as(u16, self.base[field.end - 1]) << 8 | @as(u16, self.base[field.start])));
         } else {
             return InstructionErrors.UnhandledRange;
         }
     }
 
     pub fn getDisplacement(self: *const RawInstruction) InstructionErrors!i16 {
-        return self.extractValue(self.data_map.displacement) catch |err| switch (err) {
-            InstructionErrors.MissingField => InstructionErrors.NoDisplacement,
-            else => err,
-        };
+        const displacement_map = self.data_map.displacement orelse return InstructionErrors.NoDisplacement;
+        return self.extractValue(displacement_map);
     }
 
     pub fn getData(self: *const RawInstruction) InstructionErrors!i16 {
-        return self.extractValue(self.data_map.data) catch |err| switch (err) {
-            InstructionErrors.MissingField => InstructionErrors.NoData,
-            else => err,
-        };
+        const data_map = self.data_map.data orelse return InstructionErrors.NoData;
+        return self.extractValue(data_map);
     }
 };
 

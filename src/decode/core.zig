@@ -712,10 +712,10 @@ test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
     try std.testing.expectEqualStrings("byte 7", result.args[1]);
 }
 
-test "decodeInstruction - MOV Decode - memory to accumulator" {
+test "decodeInstruction - MOV Decode - memory to accumulator narrow" {
     var allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10100001, 0b11111011, 0, 0, 0, 0 },
+        [_]u8{ 0b1010_0000, 120, 0, 0, 0, 0 },
         2,
     );
 
@@ -724,13 +724,13 @@ test "decodeInstruction - MOV Decode - memory to accumulator" {
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("ax", result.args[0]);
-    try std.testing.expectEqualStrings("[2555]", result.args[1]);
+    try std.testing.expectEqualStrings("[120]", result.args[1]);
 }
 
-test "decodeInstruction - MOV Decode - accumulator to memory" {
+test "decodeInstruction - MOV Decode - accumulator to memory wide" {
     var allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10100011, 0b11111011, 0, 0, 0, 0 },
+        [_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
         2,
     );
 
@@ -738,6 +738,6 @@ test "decodeInstruction - MOV Decode - accumulator to memory" {
     defer result.deinit(&allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
-    try std.testing.expectEqualStrings("[2555]", result.args[0]);
+    try std.testing.expectEqualStrings("[384]", result.args[0]);
     try std.testing.expectEqualStrings("ax", result.args[1]);
 }

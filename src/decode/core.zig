@@ -223,7 +223,9 @@ test "decodeOpcode - MOV Immediate to register wide" {
 pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_masks.InstructionDataMap {
     var result = opcode_masks.InstructionDataMap{};
     switch (decoded_opcode.id) {
-        opcode_masks.OpcodeId.movRegOrMemToFromReg => {
+        opcode_masks.OpcodeId.movRegOrMemToFromReg,
+        opcode_masks.OpcodeId.addRegOrMemToEither,
+        => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
                     0b00 => if (decoded_opcode.regOrMem == 0b110)
@@ -444,7 +446,9 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
     defer args.deinit();
 
     switch (raw.opcode.id) {
-        opcode_masks.OpcodeId.movRegOrMemToFromReg => {
+        opcode_masks.OpcodeId.movRegOrMemToFromReg,
+        opcode_masks.OpcodeId.addRegOrMemToEither,
+        => {
             // TODO improve optional unwraps
             switch (raw.opcode.mod.?) {
                 0b00 => { // Memory mode, no displacement

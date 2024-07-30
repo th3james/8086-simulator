@@ -495,7 +495,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
                     },
                 },
             );
-            try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator));
+            try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
             const immediate = try raw.getData();
             const immediate_size = if (raw.opcode.wide.?)
                 "word"
@@ -564,9 +564,9 @@ fn appendEffectiveAddress(
             u8,
             register_names.registerName(opcode.reg.?, opcode.wide.?),
         ));
-        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator));
+        try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
     } else {
-        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator));
+        try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
         try args.append(try allocator.dupe(
             u8,
             register_names.registerName(opcode.reg.?, opcode.wide.?),

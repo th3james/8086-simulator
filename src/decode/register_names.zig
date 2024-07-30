@@ -71,8 +71,10 @@ test "effective address options 8-bit displacement" {
     try std.testing.expectEqual(1, result.displacement);
 }
 
-// TODO re-order arguments
-pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std.mem.Allocator) ![]const u8 {
+pub fn renderEffectiveAddress(
+    allocator: std.mem.Allocator,
+    effectiveAddress: EffectiveAddress,
+) ![]const u8 {
     // TODO this can be by optimised by reducing the number of allocations
     var args = std.ArrayList([]const u8).init(allocator);
     defer {
@@ -108,7 +110,7 @@ pub fn renderEffectiveAddress(effectiveAddress: EffectiveAddress, allocator: std
 test "render effective address no displacement" {
     var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = 0 };
-    const result = try renderEffectiveAddress(input, allocator);
+    const result = try renderEffectiveAddress(allocator, input);
     defer allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si]", result);
 }
@@ -116,7 +118,7 @@ test "render effective address no displacement" {
 test "render effective address ignore zero register" {
     var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.si, .r2 = Register.none, .displacement = 0 };
-    const result = try renderEffectiveAddress(input, allocator);
+    const result = try renderEffectiveAddress(allocator, input);
     defer allocator.free(result);
     try std.testing.expectEqualStrings("[si]", result);
 }
@@ -124,7 +126,7 @@ test "render effective address ignore zero register" {
 test "render effective address with displacement" {
     var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = 250 };
-    const result = try renderEffectiveAddress(input, allocator);
+    const result = try renderEffectiveAddress(allocator, input);
     defer allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si + 250]", result);
 }
@@ -132,7 +134,7 @@ test "render effective address with displacement" {
 test "render effective address with negative displacement" {
     var allocator = std.testing.allocator;
     const input = EffectiveAddress{ .r1 = Register.bx, .r2 = Register.si, .displacement = -37 };
-    const result = try renderEffectiveAddress(input, allocator);
+    const result = try renderEffectiveAddress(allocator, input);
     defer allocator.free(result);
     try std.testing.expectEqualStrings("[bx + si - 37]", result);
 }

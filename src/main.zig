@@ -31,11 +31,17 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
     try stdout.print("; {s} disassembly\n", .{file_path});
     try stdout.print("bits 16\n", .{});
 
+    var arena = std.heap.ArenaAllocator.init(allocator.*);
+    defer arena.deinit();
+
     const MAX_INSTRUCTION_SIZE = 6;
     const MAX_OPCODE_LENGTH = 2;
     var buffer: [1]u8 = undefined;
 
     while (true) {
+        _ = arena.reset(.retain_capacity);
+        const arena_allocator = arena.allocator();
+
         var instruction_bytes: [MAX_INSTRUCTION_SIZE]u8 = [_]u8{0} ** MAX_INSTRUCTION_SIZE;
 
         var opcode_length: u3 = 0;
@@ -93,11 +99,10 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
         // std.debug.print("Input {b}\n", .{raw_instruction.base});
         // std.debug.print("\t{any}\n", .{raw_instruction.opcode});
         // std.debug.print("\t{any}\n", .{raw_instruction.data_map});
-        const instruction_args = try decode.decodeArgs(allocator, raw_instruction);
-        defer instruction_args.deinit(allocator);
 
-        const args_str = try std.mem.join(allocator.*, ", ", instruction_args.args);
-        defer allocator.free(args_str);
+        const instruction_args = try decode.decodeArgs(arena_allocator, raw_instruction);
+
+        const args_str = try std.mem.join(arena_allocator, ", ", instruction_args.args);
         // std.debug.print("Result: {s} {s}\n", .{ opcode.name, args_str });
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }

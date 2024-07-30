@@ -3,7 +3,7 @@ const mov = @import("mov.zig");
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
 
-pub const InstructionErrors = error{ MissingField, UnhandledRange, NoDisplacement, NoData };
+pub const InstructionErrors = error{ UnhandledRange, NoDisplacement, NoData };
 pub const RawInstruction = struct {
     base: [6]u8,
     opcode: opcode_masks.DecodedOpcode,
@@ -107,7 +107,7 @@ test "RawInstruction.getData - narrow" {
 const InstructionArgs = struct {
     args: []const []const u8,
 
-    pub fn deinit(self: *const InstructionArgs, allocator: *const std.mem.Allocator) void {
+    pub fn deinit(self: *const InstructionArgs, allocator: std.mem.Allocator) void {
         for (self.args) |arg| {
             allocator.free(arg);
         }
@@ -439,8 +439,8 @@ test "getInstructionLength - returns the maximum end value when multiple fields 
     try std.testing.expectEqual(3, getInstructionLength(in));
 }
 
-pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !InstructionArgs {
-    var args = std.ArrayList([]const u8).init(allocator.*);
+pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !InstructionArgs {
+    var args = std.ArrayList([]const u8).init(allocator);
     defer args.deinit();
 
     switch (raw.opcode.id) {
@@ -451,7 +451,7 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
                     if (raw.opcode.regOrMem == 0b110) { // Direct address
                         try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
                         const memory_address = try raw.getDisplacement();
-                        const memory_address_str = try std.fmt.allocPrint(allocator.*, "[{}]", .{memory_address});
+                        const memory_address_str = try std.fmt.allocPrint(allocator, "[{}]", .{memory_address});
                         try args.append(memory_address_str);
                     } else {
                         try appendEffectiveAddress(
@@ -495,13 +495,13 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
                     },
                 },
             );
-            try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
+            try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator));
             const immediate = try raw.getData();
             const immediate_size = if (raw.opcode.wide.?)
                 "word"
             else
                 "byte";
-            const immediate_str = try std.fmt.allocPrint(allocator.*, "{s} {}", .{
+            const immediate_str = try std.fmt.allocPrint(allocator, "{s} {}", .{
                 immediate_size,
                 immediate,
             });
@@ -515,34 +515,34 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
             if (raw.opcode.wide.?) {
                 const data_signed = try raw.getData();
                 const data: i16 = @bitCast(data_signed);
-                const data_str = try std.fmt.allocPrint(allocator.*, "{d}", .{data});
+                const data_str = try std.fmt.allocPrint(allocator, "{d}", .{data});
                 try args.append(data_str);
             } else {
                 const data: i8 = @bitCast(raw.base[1]);
-                const data_str = try std.fmt.allocPrint(allocator.*, "{d}", .{data});
+                const data_str = try std.fmt.allocPrint(allocator, "{d}", .{data});
                 try args.append(data_str);
             }
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
         opcode_masks.OpcodeId.memoryToAccumulator => {
-            try args.append(try std.fmt.allocPrint(allocator.*, "ax", .{}));
-            try args.append(try std.fmt.allocPrint(allocator.*, "[{d}]", .{
+            try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
+            try args.append(try std.fmt.allocPrint(allocator, "[{d}]", .{
                 try raw.getData(),
             }));
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
         opcode_masks.OpcodeId.accumulatorToMemory => {
-            try args.append(try std.fmt.allocPrint(allocator.*, "[{d}]", .{
+            try args.append(try std.fmt.allocPrint(allocator, "[{d}]", .{
                 try raw.getData(),
             }));
-            try args.append(try std.fmt.allocPrint(allocator.*, "ax", .{}));
+            try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
         opcode_masks.OpcodeId.unknown => {
-            const raw_bytes = try std.fmt.allocPrint(allocator.*, "{b}", .{raw.base});
+            const raw_bytes = try std.fmt.allocPrint(allocator, "{b}", .{raw.base});
             try args.append(raw_bytes);
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
@@ -550,7 +550,7 @@ pub fn decodeArgs(allocator: *std.mem.Allocator, raw: RawInstruction) !Instructi
 }
 
 fn appendEffectiveAddress(
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     args: *std.ArrayList([]const u8),
     opcode: opcode_masks.DecodedOpcode,
     displacement: i16,
@@ -564,9 +564,9 @@ fn appendEffectiveAddress(
             u8,
             register_names.registerName(opcode.reg.?, opcode.wide.?),
         ));
-        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
+        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator));
     } else {
-        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator.*));
+        try args.append(try register_names.renderEffectiveAddress(effectiveAddress, allocator));
         try args.append(try allocator.dupe(
             u8,
             register_names.registerName(opcode.reg.?, opcode.wide.?),
@@ -584,14 +584,14 @@ fn buildRawInstructionFromBytes(bytes: [6]u8, length: u4) !RawInstruction {
 }
 
 test "decodeArgs - MOV Decode - Reg to Reg" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b10001000, 0b11000001, 0, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("cl", result.args[0]);
@@ -599,14 +599,14 @@ test "decodeArgs - MOV Decode - Reg to Reg" {
 }
 
 test "decodeArgs - MOV Direct address" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b10001000, 0b00000110, 0b1, 0b1, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("al", result.args[0]);
@@ -614,14 +614,14 @@ test "decodeArgs - MOV Direct address" {
 }
 
 test "decodeArgs - MOV reg or memory" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b1000_1011, 0b0100_0001, 0b1101_1011, 0b0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("ax", result.args[0]);
@@ -629,14 +629,14 @@ test "decodeArgs - MOV reg or memory" {
 }
 
 test "decodeArgs - MOV Decode - Immediate to register narrow positive" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
@@ -644,14 +644,14 @@ test "decodeArgs - MOV Decode - Immediate to register narrow positive" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
@@ -659,14 +659,14 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b10110001, 0b11111010, 0, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, false), result.args[0]);
@@ -674,14 +674,14 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register wide" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b10111001, 0b11111101, 0b11111111, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings(register_names.registerName(0b1, true), result.args[0]);
@@ -689,14 +689,14 @@ test "decodeInstruction - MOV Decode - Immediate to register wide" {
 }
 
 test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b11000110, 0b11, 7, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("[bp + di]", result.args[0]);
@@ -704,14 +704,14 @@ test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
 }
 
 test "decodeInstruction - MOV Decode - memory to accumulator narrow" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b1010_0000, 120, 0, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("ax", result.args[0]);
@@ -719,14 +719,14 @@ test "decodeInstruction - MOV Decode - memory to accumulator narrow" {
 }
 
 test "decodeInstruction - MOV Decode - accumulator to memory wide" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         [_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
         2,
     );
 
-    const result = try decodeArgs(&allocator, raw_instruction);
-    defer result.deinit(&allocator);
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
 
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("[384]", result.args[0]);

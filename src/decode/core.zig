@@ -227,6 +227,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         opcode_masks.OpcodeId.movRegOrMemToFromReg,
         opcode_masks.OpcodeId.addRegOrMemToEither,
         opcode_masks.OpcodeId.subRegOrMemToEither,
+        opcode_masks.OpcodeId.cmpRegOrMemToReg,
         => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
@@ -257,6 +258,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         opcode_masks.OpcodeId.movImmediateToRegOrMem,
         opcode_masks.OpcodeId.addImmediateToRegOrMem,
         opcode_masks.OpcodeId.subImmediateToRegOrMem,
+        opcode_masks.OpcodeId.cmpImmediateToRegOrMem,
         => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
@@ -471,6 +473,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
         opcode_masks.OpcodeId.movRegOrMemToFromReg,
         opcode_masks.OpcodeId.addRegOrMemToEither,
         opcode_masks.OpcodeId.subRegOrMemToEither,
+        opcode_masks.OpcodeId.cmpRegOrMemToReg,
         => {
             // TODO improve optional unwraps
             switch (raw.opcode.mod.?) {
@@ -515,8 +518,35 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
         opcode_masks.OpcodeId.movImmediateToRegOrMem,
         opcode_masks.OpcodeId.addImmediateToRegOrMem,
         opcode_masks.OpcodeId.subImmediateToRegOrMem,
+        opcode_masks.OpcodeId.cmpImmediateToRegOrMem,
         => {
             switch (raw.opcode.mod.?) {
+                0b00 => { // Memory mode, no displacement
+                    if (raw.opcode.regOrMem == 0b110) { // Direct address
+                        const memory_address = try raw.getDisplacement();
+                        const memory_address_str = try std.fmt.allocPrint(allocator, "[{}]", .{memory_address});
+                        try args.append(memory_address_str);
+                    } else {
+                        const effectiveAddress = register_names.effectiveAddressRegisters(raw.opcode.regOrMem.?, // TODO can this unwrap be avoided?
+                            raw.getDisplacement() catch |err| switch (err) {
+                            InstructionErrors.NoDisplacement => 0,
+                            else => {
+                                return err;
+                            },
+                        });
+                        try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
+                    }
+                    const immediate = try raw.getData();
+                    const immediate_size = if (raw.opcode.wide.?)
+                        "word"
+                    else
+                        "byte";
+                    const immediate_str = try std.fmt.allocPrint(allocator, "{s} {}", .{
+                        immediate_size,
+                        immediate,
+                    });
+                    try args.append(immediate_str);
+                },
                 0b11 => { // Register to Register
                     const regOrMemName = register_names.registerName(raw.opcode.regOrMem.?, raw.opcode.wide.?);
                     try args.append(try allocator.dupe(u8, regOrMemName));

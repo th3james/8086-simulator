@@ -142,6 +142,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
                     if (def) |field_def| {
                         const value = (identifier & field_def.mask) >> field_def.shift;
                         @field(decoded_opcode, field) = switch (@TypeOf(@field(decoded_opcode, field))) {
+                            bool => value != 0,
                             ?bool => value != 0,
                             ?u2, ?u3 => @intCast(value),
                             else => @compileError("Unsupported field type for " ++ field),
@@ -250,7 +251,9 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                     2,
             };
         },
-        opcode_masks.OpcodeId.movImmediateToRegOrMem => {
+        opcode_masks.OpcodeId.movImmediateToRegOrMem,
+        opcode_masks.OpcodeId.addImmediateToRegOrMem,
+        => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
                     0b00 => if (decoded_opcode.regOrMem == 0b110)
@@ -270,7 +273,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
 
             result.data = .{
                 .start = next,
-                .end = if (decoded_opcode.wide.?)
+                .end = if (decoded_opcode.wide.? and !decoded_opcode.sign)
                     next + 2
                 else
                     next + 1,
@@ -392,6 +395,21 @@ test "getInstructionDataMap - MOV Immediate to register/memory wide, no displace
     try std.testing.expectEqual(4, result.data.?.end);
 }
 
+test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extension" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.addImmediateToRegOrMem,
+        .name = "mov",
+        .sign = true,
+        .wide = true,
+    };
+
+    const result = getInstructionDataMap(decoded_opcode);
+
+    try std.testing.expectEqual(null, result.displacement);
+    try std.testing.expectEqual(2, result.data.?.start);
+    try std.testing.expectEqual(3, result.data.?.end);
+}
+
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
     var length: u4 = 0;
 
@@ -489,27 +507,40 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode_masks.OpcodeId.movImmediateToRegOrMem => {
-            const effectiveAddress = register_names.effectiveAddressRegisters(
-                raw.opcode.regOrMem.?, // TODO can this unwrap be avoided?
-                raw.getDisplacement() catch |err| switch (err) {
-                    InstructionErrors.NoDisplacement => 0,
-                    else => {
-                        return err;
-                    },
+        opcode_masks.OpcodeId.movImmediateToRegOrMem,
+        opcode_masks.OpcodeId.addImmediateToRegOrMem,
+        => {
+            switch (raw.opcode.mod.?) {
+                0b11 => { // Register to Register
+                    const regOrMemName = register_names.registerName(raw.opcode.regOrMem.?, raw.opcode.wide.?);
+                    try args.append(try allocator.dupe(u8, regOrMemName));
+                    const immediate = try raw.getData();
+                    const immediate_str = try std.fmt.allocPrint(allocator, "{}", .{
+                        immediate,
+                    });
+                    try args.append(immediate_str);
                 },
-            );
-            try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
-            const immediate = try raw.getData();
-            const immediate_size = if (raw.opcode.wide.?)
-                "word"
-            else
-                "byte";
-            const immediate_str = try std.fmt.allocPrint(allocator, "{s} {}", .{
-                immediate_size,
-                immediate,
-            });
-            try args.append(immediate_str);
+                else => {
+                    const effectiveAddress = register_names.effectiveAddressRegisters(raw.opcode.regOrMem.?, // TODO can this unwrap be avoided?
+                        raw.getDisplacement() catch |err| switch (err) {
+                        InstructionErrors.NoDisplacement => 0,
+                        else => {
+                            return err;
+                        },
+                    });
+                    try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
+                    const immediate = try raw.getData();
+                    const immediate_size = if (raw.opcode.wide.?)
+                        "word"
+                    else
+                        "byte";
+                    const immediate_str = try std.fmt.allocPrint(allocator, "{s} {}", .{
+                        immediate_size,
+                        immediate,
+                    });
+                    try args.append(immediate_str);
+                },
+            }
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
@@ -735,4 +766,28 @@ test "decodeInstruction - MOV Decode - accumulator to memory wide" {
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("[384]", result.args[0]);
     try std.testing.expectEqualStrings("ax", result.args[1]);
+}
+
+// TODO - This is actually an integration test
+test "decodeInstruction - ADD immediate to reg or mem" {
+    const allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        // Note: 4th byte should be ignored due to sign extension
+        [_]u8{ 0b1000_0011, 0b1100_0110, 0b0000_0010, 0b1000_0011, 0, 0 },
+        2,
+    );
+
+    try std.testing.expectEqualStrings("add", raw_instruction.opcode.name);
+    try std.testing.expectEqual(opcode_masks.OpcodeId.addImmediateToRegOrMem, raw_instruction.opcode.id);
+    try std.testing.expectEqual(true, raw_instruction.opcode.sign);
+    try std.testing.expectEqual(true, raw_instruction.opcode.wide);
+    try std.testing.expectEqual(0b11, raw_instruction.opcode.mod);
+    try std.testing.expectEqual(0b110, raw_instruction.opcode.regOrMem);
+
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("si", result.args[0]);
+    try std.testing.expectEqualStrings("2", result.args[1]);
 }

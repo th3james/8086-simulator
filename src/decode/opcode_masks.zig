@@ -12,6 +12,7 @@ pub const OpcodeId = enum {
     accumulatorToMemory,
     addImmediateToAccumulator,
     subImmediateToAccumulator,
+    cmpImmediateWithAccumulator,
     unknown,
 };
 
@@ -180,6 +181,14 @@ pub const OpcodeTable = [_]OpcodeDefinition{
         .name = "sub",
         .identifier_mask = 0b1111_1110_0000_0000,
         .identifier = 0b0010_1100_0000_0000,
+        .bytes_required = 1,
+        .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
+    },
+    .{
+        .id = OpcodeId.cmpImmediateWithAccumulator,
+        .name = "cmp",
+        .identifier_mask = 0b1111_1110_0000_0000,
+        .identifier = 0b0011_1100_0000_0000,
         .bytes_required = 1,
         .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
     },

@@ -96,9 +96,11 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
             .data_map = data_map,
         };
 
-        // std.debug.print("Input {b}\n", .{raw_instruction.base});
-        // std.debug.print("\t{any}\n", .{raw_instruction.opcode});
-        // std.debug.print("\t{any}\n", .{raw_instruction.data_map});
+        if (false) { //raw_instruction.opcode.id == .cmpImmediateToRegOrMem) {
+            std.debug.print("Input {b}\n", .{raw_instruction.base});
+            std.debug.print("\t{any}\n", .{raw_instruction.opcode});
+            std.debug.print("\t{any}\n", .{raw_instruction.data_map});
+        }
 
         const instruction_args = try decode.decodeArgs(arena_allocator, raw_instruction);
 

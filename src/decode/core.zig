@@ -246,6 +246,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         opcode_masks.OpcodeId.memoryToAccumulator,
         opcode_masks.OpcodeId.addImmediateToAccumulator,
         opcode_masks.OpcodeId.subImmediateToAccumulator,
+        opcode_masks.OpcodeId.cmpImmediateWithAccumulator,
         => {
             result.data = .{
                 .start = 1,
@@ -616,6 +617,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
 
         opcode_masks.OpcodeId.addImmediateToAccumulator,
         opcode_masks.OpcodeId.subImmediateToAccumulator,
+        opcode_masks.OpcodeId.cmpImmediateWithAccumulator,
         => {
             if (raw.opcode.wide.?) {
                 try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));

@@ -6,6 +6,7 @@ pub const OpcodeId = enum {
     addImmediateToRegOrMem,
     memoryToAccumulator,
     accumulatorToMemory,
+    addImmediateToAccumulator,
     unknown,
 };
 
@@ -112,6 +113,14 @@ pub const OpcodeTable = [_]OpcodeDefinition{
         .name = "mov",
         .identifier_mask = 0b1111_1110_0000_0000,
         .identifier = 0b1010_0010_0000_0000,
+        .bytes_required = 1,
+        .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
+    },
+    .{
+        .id = OpcodeId.addImmediateToAccumulator,
+        .name = "add",
+        .identifier_mask = 0b1111_1110_0000_0000,
+        .identifier = 0b0000_0100_0000_0000,
         .bytes_required = 1,
         .wide = .{ .mask = 0b0000_0001_0000_0000, .shift = 8 },
     },

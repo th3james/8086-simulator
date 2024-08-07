@@ -242,6 +242,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         opcode_masks.OpcodeId.movImmediateToReg,
         opcode_masks.OpcodeId.accumulatorToMemory,
         opcode_masks.OpcodeId.memoryToAccumulator,
+        opcode_masks.OpcodeId.addImmediateToAccumulator,
         => {
             result.data = .{
                 .start = 1,
@@ -573,6 +574,18 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
                 try raw.getData(),
             }));
             try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
+            return InstructionArgs{ .args = try args.toOwnedSlice() };
+        },
+
+        opcode_masks.OpcodeId.addImmediateToAccumulator => {
+            if (raw.opcode.wide.?) {
+                try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
+            } else {
+                try args.append(try std.fmt.allocPrint(allocator, "al", .{}));
+            }
+            try args.append(try std.fmt.allocPrint(allocator, "{d}", .{
+                try raw.getData(),
+            }));
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 

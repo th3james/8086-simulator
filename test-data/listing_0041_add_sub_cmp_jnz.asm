@@ -126,9 +126,13 @@ jge -20
 ;jg label
 jg -22
 ;jnb label
+jae -24
 ;ja label
+ja -26
 ;jnp label
+jpo -28
 ;jno label
+jno -30
 ;jns label
 ;loop label
 ;loopz label

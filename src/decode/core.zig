@@ -297,6 +297,10 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         .jmpOnSign,
         .jmpIfGreater,
         .jmpIfGreaterOrEq,
+        .jmpIfAbove,
+        .jmpIfAboveOrEq,
+        .jmpIfParOdd,
+        .jmpOnNotOverflow,
         => {
             result.displacement = .{
                 .start = 1,
@@ -671,6 +675,10 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
         .jmpOnSign,
         .jmpIfGreater,
         .jmpIfGreaterOrEq,
+        .jmpIfAbove,
+        .jmpIfAboveOrEq,
+        .jmpIfParOdd,
+        .jmpOnNotOverflow,
         => {
             try args.append(try std.fmt.allocPrint(allocator, "{d}", .{
                 try raw.getDisplacement(),

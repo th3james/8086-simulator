@@ -24,6 +24,10 @@ pub const OpcodeId = enum {
     jmpOnSign,
     jmpIfGreater,
     jmpIfGreaterOrEq,
+    jmpIfAbove,
+    jmpIfAboveOrEq,
+    jmpIfParOdd,
+    jmpOnNotOverflow,
     unknown,
 };
 
@@ -278,6 +282,34 @@ pub const OpcodeTable = [_]OpcodeDefinition{
         .name = "jge",
         .identifier_mask = 0b1111_1111_0000_0000,
         .identifier = 0b0111_1101_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .jmpIfAbove,
+        .name = "ja",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b0111_0111_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .jmpIfAboveOrEq,
+        .name = "jae",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b0111_0011_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .jmpIfParOdd,
+        .name = "jpo",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b0111_1011_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .jmpOnNotOverflow,
+        .name = "jno",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b0111_0001_0000_0000,
         .bytes_required = 1,
     },
 };

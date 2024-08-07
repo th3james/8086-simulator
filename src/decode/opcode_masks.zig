@@ -28,6 +28,11 @@ pub const OpcodeId = enum {
     jmpIfAboveOrEq,
     jmpIfParOdd,
     jmpOnNotOverflow,
+    jmpOnNotSign,
+    loopCxTimes,
+    loopIfZero,
+    loopIfNotZero,
+    jmpIfCxZero,
     unknown,
 };
 
@@ -310,6 +315,41 @@ pub const OpcodeTable = [_]OpcodeDefinition{
         .name = "jno",
         .identifier_mask = 0b1111_1111_0000_0000,
         .identifier = 0b0111_0001_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .jmpOnNotSign,
+        .name = "jns",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b0111_1001_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .loopCxTimes,
+        .name = "loop",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b1110_0010_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .loopIfZero,
+        .name = "loopz",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b1110_0001_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .loopIfNotZero,
+        .name = "loopnz",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b1110_0000_0000_0000,
+        .bytes_required = 1,
+    },
+    .{
+        .id = .jmpIfCxZero,
+        .name = "jcxz",
+        .identifier_mask = 0b1111_1111_0000_0000,
+        .identifier = 0b1110_0011_0000_0000,
         .bytes_required = 1,
     },
 };

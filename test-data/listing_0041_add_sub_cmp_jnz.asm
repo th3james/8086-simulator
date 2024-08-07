@@ -134,7 +134,12 @@ jpo -28
 ;jno label
 jno -30
 ;jns label
+jns -32
 ;loop label
+loop -34
 ;loopz label
+loopz -36
 ;loopnz label
+loopnz -38
 ;jcxz label
+jcxz -40

@@ -226,6 +226,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
     switch (decoded_opcode.id) {
         opcode_masks.OpcodeId.movRegOrMemToFromReg,
         opcode_masks.OpcodeId.addRegOrMemToEither,
+        opcode_masks.OpcodeId.subRegOrMemToEither,
         => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
@@ -243,6 +244,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         opcode_masks.OpcodeId.accumulatorToMemory,
         opcode_masks.OpcodeId.memoryToAccumulator,
         opcode_masks.OpcodeId.addImmediateToAccumulator,
+        opcode_masks.OpcodeId.subImmediateToAccumulator,
         => {
             result.data = .{
                 .start = 1,
@@ -254,6 +256,7 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
         },
         opcode_masks.OpcodeId.movImmediateToRegOrMem,
         opcode_masks.OpcodeId.addImmediateToRegOrMem,
+        opcode_masks.OpcodeId.subImmediateToRegOrMem,
         => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
@@ -467,6 +470,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
     switch (raw.opcode.id) {
         opcode_masks.OpcodeId.movRegOrMemToFromReg,
         opcode_masks.OpcodeId.addRegOrMemToEither,
+        opcode_masks.OpcodeId.subRegOrMemToEither,
         => {
             // TODO improve optional unwraps
             switch (raw.opcode.mod.?) {
@@ -510,6 +514,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
 
         opcode_masks.OpcodeId.movImmediateToRegOrMem,
         opcode_masks.OpcodeId.addImmediateToRegOrMem,
+        opcode_masks.OpcodeId.subImmediateToRegOrMem,
         => {
             switch (raw.opcode.mod.?) {
                 0b11 => { // Register to Register
@@ -562,6 +567,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
         },
 
         opcode_masks.OpcodeId.memoryToAccumulator => {
+            // TODO handle wide
             try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
             try args.append(try std.fmt.allocPrint(allocator, "[{d}]", .{
                 try raw.getData(),
@@ -573,11 +579,14 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
             try args.append(try std.fmt.allocPrint(allocator, "[{d}]", .{
                 try raw.getData(),
             }));
+            // TODO handle wide
             try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode_masks.OpcodeId.addImmediateToAccumulator => {
+        opcode_masks.OpcodeId.addImmediateToAccumulator,
+        opcode_masks.OpcodeId.subImmediateToAccumulator,
+        => {
             if (raw.opcode.wide.?) {
                 try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
             } else {

@@ -93,23 +93,38 @@ cmp al, 9
 
 ;test_label0:
 ;jnz test_label1
+jnz 2
 ;jnz test_label0
+jnz -4
 ;test_label1:
 ;jnz test_label0
+jnz -6
 ;jnz test_label1
+jnz -4
 ;
 ;label:
 ;je label
+je -2
 ;jl label
+jl -4
 ;jle label
+jle -6
 ;jb label
+jb -8
 ;jbe label
+jbe -10
 ;jp label
+jp -12
 ;jo label
+jo -14
 ;js label
+js -16
 ;jne label
+jnz -18
 ;jnl label
+jge -20
 ;jg label
+jg -22
 ;jnb label
 ;ja label
 ;jnp label

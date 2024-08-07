@@ -224,10 +224,10 @@ test "decodeOpcode - MOV Immediate to register wide" {
 pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_masks.InstructionDataMap {
     var result = opcode_masks.InstructionDataMap{};
     switch (decoded_opcode.id) {
-        opcode_masks.OpcodeId.movRegOrMemToFromReg,
-        opcode_masks.OpcodeId.addRegOrMemToEither,
-        opcode_masks.OpcodeId.subRegOrMemToEither,
-        opcode_masks.OpcodeId.cmpRegOrMemToReg,
+        .movRegOrMemToFromReg,
+        .addRegOrMemToEither,
+        .subRegOrMemToEither,
+        .cmpRegOrMemToReg,
         => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
@@ -241,12 +241,12 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                 };
             }
         },
-        opcode_masks.OpcodeId.movImmediateToReg,
-        opcode_masks.OpcodeId.accumulatorToMemory,
-        opcode_masks.OpcodeId.memoryToAccumulator,
-        opcode_masks.OpcodeId.addImmediateToAccumulator,
-        opcode_masks.OpcodeId.subImmediateToAccumulator,
-        opcode_masks.OpcodeId.cmpImmediateWithAccumulator,
+        .movImmediateToReg,
+        .accumulatorToMemory,
+        .memoryToAccumulator,
+        .addImmediateToAccumulator,
+        .subImmediateToAccumulator,
+        .cmpImmediateWithAccumulator,
         => {
             result.data = .{
                 .start = 1,
@@ -256,10 +256,10 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                     2,
             };
         },
-        opcode_masks.OpcodeId.movImmediateToRegOrMem,
-        opcode_masks.OpcodeId.addImmediateToRegOrMem,
-        opcode_masks.OpcodeId.subImmediateToRegOrMem,
-        opcode_masks.OpcodeId.cmpImmediateToRegOrMem,
+        .movImmediateToRegOrMem,
+        .addImmediateToRegOrMem,
+        .subImmediateToRegOrMem,
+        .cmpImmediateToRegOrMem,
         => {
             if (decoded_opcode.mod) |mod| {
                 result.displacement = switch (mod) {
@@ -284,6 +284,23 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                     next + 2
                 else
                     next + 1,
+            };
+        },
+        .jmpIfZero,
+        .jmpIfNotZero,
+        .jmpIfLess,
+        .jmpIfLessOrEq,
+        .jmpIfBelow,
+        .jmpIfBelowOrEq,
+        .jmpIfParity,
+        .jmpOnOverflow,
+        .jmpOnSign,
+        .jmpIfGreater,
+        .jmpIfGreaterOrEq,
+        => {
+            result.displacement = .{
+                .start = 1,
+                .end = 2,
             };
         },
         else => {
@@ -415,6 +432,19 @@ test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extensi
     try std.testing.expectEqual(null, result.displacement);
     try std.testing.expectEqual(2, result.data.?.start);
     try std.testing.expectEqual(3, result.data.?.end);
+}
+
+test "getInstructionDataMap - JNZ has signed displacement" {
+    const decoded_opcode = opcode_masks.DecodedOpcode{
+        .id = opcode_masks.OpcodeId.jmpIfNotZero,
+        .name = "jnz",
+    };
+
+    const result = getInstructionDataMap(decoded_opcode);
+
+    try std.testing.expectEqual(null, result.data);
+    try std.testing.expectEqual(1, result.displacement.?.start);
+    try std.testing.expectEqual(2, result.displacement.?.end);
 }
 
 pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
@@ -626,6 +656,24 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
             }
             try args.append(try std.fmt.allocPrint(allocator, "{d}", .{
                 try raw.getData(),
+            }));
+            return InstructionArgs{ .args = try args.toOwnedSlice() };
+        },
+
+        .jmpIfZero,
+        .jmpIfNotZero,
+        .jmpIfLess,
+        .jmpIfLessOrEq,
+        .jmpIfBelow,
+        .jmpIfBelowOrEq,
+        .jmpIfParity,
+        .jmpOnOverflow,
+        .jmpOnSign,
+        .jmpIfGreater,
+        .jmpIfGreaterOrEq,
+        => {
+            try args.append(try std.fmt.allocPrint(allocator, "{d}", .{
+                try raw.getDisplacement(),
             }));
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
@@ -844,4 +892,19 @@ test "decodeInstruction - ADD immediate to reg or mem" {
     try std.testing.expectEqual(@as(usize, 2), result.args.len);
     try std.testing.expectEqualStrings("si", result.args[0]);
     try std.testing.expectEqualStrings("2", result.args[1]);
+}
+
+test "decodeInstruction - JNZ" {
+    const allocator = std.testing.allocator;
+    const raw_instruction = try buildRawInstructionFromBytes(
+        [_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArgs(allocator, raw_instruction);
+    defer result.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 2), result.args.len);
+    try std.testing.expectEqualStrings("[384]", result.args[0]);
+    try std.testing.expectEqualStrings("ax", result.args[1]);
 }

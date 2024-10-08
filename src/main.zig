@@ -1,5 +1,7 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const decode = @import("decode/core.zig");
+const memory = @import("memory.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
 
@@ -17,18 +19,20 @@ pub fn main() !void {
 
     const file_path = args[1];
 
-    try disassembleFile(&allocator, file_path);
+    const emu_mem = try allocator.create(memory.Memory);
+    defer _ = allocator.destroy(emu_mem);
+
+    const program_len = try memory.loadFromFile(file_path, emu_mem);
+    assert(program_len > 0);
+
+    try disassemble(&allocator, emu_mem, program_len);
 }
 
-fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
-    const file = try std.fs.cwd().openFile(file_path, .{});
-    defer file.close();
-
+fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: u32) !void {
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    try stdout.print("; {s} disassembly\n", .{file_path});
     try stdout.print("bits 16\n", .{});
 
     var arena = std.heap.ArenaAllocator.init(allocator.*);
@@ -36,9 +40,9 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
 
     const MAX_INSTRUCTION_SIZE = 6;
     const MAX_OPCODE_LENGTH = 2;
-    var buffer: [1]u8 = undefined;
 
-    while (true) {
+    var memory_address: u32 = 0;
+    while (memory_address < program_len) {
         _ = arena.reset(.retain_capacity);
         const arena_allocator = arena.allocator();
 
@@ -47,16 +51,8 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
         var opcode_length: u3 = 0;
 
         while (opcode_length < MAX_OPCODE_LENGTH) {
-            const bytes_read = try file.read(&buffer);
-            if (bytes_read == 0) {
-                if (opcode_length == 0) {
-                    break;
-                } else {
-                    return InvalidBinaryErrors.IncompleteInstruction;
-                }
-            }
-
-            instruction_bytes[opcode_length] = buffer[0];
+            instruction_bytes[opcode_length] = mem.read(memory_address);
+            memory_address += 1;
             opcode_length += 1;
 
             // if this errors, loop to read more bytes
@@ -78,15 +74,8 @@ fn disassembleFile(allocator: *std.mem.Allocator, file_path: []const u8) !void {
         const full_instruction_length = decode.getInstructionLength(data_map);
 
         while (opcode_length < full_instruction_length) {
-            const bytes_read = try file.read(&buffer);
-            if (bytes_read == 0) {
-                if (opcode_length == 0) {
-                    break; // end of file
-                } else {
-                    return InvalidBinaryErrors.IncompleteInstruction;
-                }
-            }
-            instruction_bytes[opcode_length] = buffer[0];
+            instruction_bytes[opcode_length] = mem.read(memory_address);
+            memory_address += 1;
             opcode_length += 1;
         }
 

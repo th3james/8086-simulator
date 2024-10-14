@@ -31,14 +31,11 @@ pub fn main() !void {
 
 fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) !opcode_masks.DecodedOpcode {
     const MAX_OPCODE_LENGTH = 2;
-    const memory_address = start_addr; // TODO dumb
-    const program_len = limit_addr; // TODO dumb
-
     var opcode_length: u3 = 1;
     return while (opcode_length <= MAX_OPCODE_LENGTH) {
-        const opcode_end = memory_address + opcode_length;
-        if (opcode_end <= program_len) {
-            const opcode_bytes = memory.sliceMemory(&mem, memory_address, opcode_end);
+        const opcode_end = start_addr + opcode_length;
+        if (opcode_end <= limit_addr) {
+            const opcode_bytes = memory.sliceMemory(&mem, start_addr, opcode_end);
             assert(opcode_bytes.len > 0);
             assert(opcode_bytes.len <= MAX_OPCODE_LENGTH);
 

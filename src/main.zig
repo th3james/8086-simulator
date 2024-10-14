@@ -1,6 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const decode = @import("decode/core.zig");
+const opcode_masks = @import("decode/opcode_masks.zig");
 const memory = @import("memory.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
@@ -28,6 +29,34 @@ pub fn main() !void {
     try disassemble(&allocator, emu_mem, program_len);
 }
 
+fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) !opcode_masks.DecodedOpcode {
+    const MAX_OPCODE_LENGTH = 2;
+    const memory_address = start_addr; // TODO dumb
+    const program_len = limit_addr; // TODO dumb
+
+    var opcode_length: u3 = 1;
+    return while (opcode_length <= MAX_OPCODE_LENGTH) {
+        const opcode_end = memory_address + opcode_length;
+        if (opcode_end <= program_len) {
+            const opcode_bytes = memory.sliceMemory(&mem, memory_address, opcode_end);
+            assert(opcode_bytes.len > 0);
+            assert(opcode_bytes.len <= MAX_OPCODE_LENGTH);
+
+            // if this errors, loop to read more bytes
+            const result = decode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
+                decode.Errors.InsufficientBytes => {
+                    opcode_length += 1;
+                    continue;
+                },
+            };
+
+            break result;
+        } else {
+            return InvalidBinaryErrors.IncompleteInstruction;
+        }
+    } else unreachable;
+}
+
 fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: u32) !void {
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
@@ -38,46 +67,28 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
     var arena = std.heap.ArenaAllocator.init(allocator.*);
     defer arena.deinit();
 
-    const MAX_INSTRUCTION_SIZE = 6;
-    const MAX_OPCODE_LENGTH = 2;
-
     var memory_address: u32 = 0;
     while (memory_address < program_len) {
         _ = arena.reset(.retain_capacity);
         const arena_allocator = arena.allocator();
 
-        var instruction_bytes: [MAX_INSTRUCTION_SIZE]u8 = [_]u8{0} ** MAX_INSTRUCTION_SIZE;
+        const opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
 
-        var opcode_length: u3 = 0;
-
-        while (opcode_length < MAX_OPCODE_LENGTH) {
-            instruction_bytes[opcode_length] = mem.read(memory_address);
-            memory_address += 1;
-            opcode_length += 1;
-
-            // if this errors, loop to read more bytes
-            _ = decode.decodeOpcode(instruction_bytes[0..opcode_length]) catch |err| switch (err) {
-                decode.Errors.InsufficientBytes => {
-                    continue;
-                },
-            };
-
-            break; // decode must have succeeded
-        }
-
-        if (opcode_length == 0) {
-            break; // EoF
-        }
-
-        const opcode = try decode.decodeOpcode(instruction_bytes[0..opcode_length]);
         const data_map = decode.getInstructionDataMap(opcode);
         const full_instruction_length = decode.getInstructionLength(data_map);
 
-        while (opcode_length < full_instruction_length) {
-            instruction_bytes[opcode_length] = mem.read(memory_address);
-            memory_address += 1;
-            opcode_length += 1;
-        }
+        const instruction_end = memory_address + @max(
+            opcode.length,
+            full_instruction_length,
+        );
+        assert(instruction_end > memory_address);
+        const instruction_bytes = if (instruction_end <= program_len)
+            memory.sliceMemory(&mem, memory_address, instruction_end)
+        else
+            return InvalidBinaryErrors.IncompleteInstruction;
+        assert((instruction_end - memory_address) > 0);
+        assert((instruction_end - memory_address) <= 6);
+        memory_address = instruction_end;
 
         const raw_instruction = decode.RawInstruction{
             .base = instruction_bytes,

@@ -1,11 +1,10 @@
 const std = @import("std");
-const mov = @import("mov.zig");
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
 
 pub const InstructionErrors = error{ UnhandledRange, NoDisplacement, NoData };
 pub const RawInstruction = struct {
-    base: [6]u8,
+    base: []const u8,
     opcode: opcode_masks.DecodedOpcode,
     data_map: opcode_masks.InstructionDataMap,
 
@@ -31,18 +30,20 @@ pub const RawInstruction = struct {
 };
 
 test "RawInstruction.getDisplacement - errors when no data map" {
+    var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .base = &base,
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
         .data_map = .{},
     };
     try std.testing.expectError(InstructionErrors.NoDisplacement, in.getDisplacement());
 }
 
 test "RawInstruction.getDisplacement - positive narrow" {
+    var base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 };
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .base = &base,
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
         .data_map = .{
             .displacement = .{
                 .start = 1,
@@ -54,9 +55,10 @@ test "RawInstruction.getDisplacement - positive narrow" {
 }
 
 test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
+    var base = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 };
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .base = &base,
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{
             .displacement = .{
                 .start = 1,
@@ -68,9 +70,10 @@ test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
 }
 
 test "RawInstruction.getDisplacement - wide" {
+    var base = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 };
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .base = &base,
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{
             .displacement = .{
                 .start = 1,
@@ -82,18 +85,20 @@ test "RawInstruction.getDisplacement - wide" {
 }
 
 test "RawInstruction.getData - errors when no data map" {
+    var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .base = &base,
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{},
     };
     try std.testing.expectError(InstructionErrors.NoData, in.getData());
 }
 
 test "RawInstruction.getData - narrow" {
+    var base = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 };
     const in = RawInstruction{
-        .base = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 },
-        .opcode = .{ .id = .movImmediateToReg, .name = "nvm" },
+        .base = &base,
+        .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{
             .data = .{
                 .start = 1,
@@ -134,6 +139,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
             var decoded_opcode = opcode_masks.DecodedOpcode{
                 .id = mask.id,
                 .name = mask.name,
+                .length = mask.bytes_required,
             };
 
             inline for (comptime std.meta.fieldNames(opcode_masks.OpcodeDefinition)) |field| {
@@ -176,6 +182,7 @@ test "decodeOpcode - MOV Memory mode, no displacement" {
     const result = try decodeOpcode(&[_]u8{ 0b1000_1000, 0b0000_0000 });
     try std.testing.expectEqual(opcode_masks.OpcodeId.movRegOrMemToFromReg, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
+    try std.testing.expectEqual(2, result.length);
     try std.testing.expectEqual(false, result.wide.?);
     try std.testing.expectEqual(0b00, result.mod.?);
     try std.testing.expectEqual(0b000, result.reg.?);
@@ -324,6 +331,7 @@ test "getInstructionDataMap - MOV Memory mode, no displacement" {
         .id = opcode_masks.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .regOrMem = 0b000,
+        .length = 2,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(null, result.displacement);
@@ -335,6 +343,7 @@ test "getInstructionDataMap - MOV Memory mode, direct address" {
         .name = "mov",
         .mod = 0b00,
         .regOrMem = 0b110,
+        .length = 2,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(2, result.displacement.?.start);
@@ -347,6 +356,7 @@ test "getInstructionDataMap - Reg-to-reg MOV Decode" {
         .name = "mov",
         .mod = 0b11,
         .regOrMem = 0b110,
+        .length = 2,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(null, result.displacement);
@@ -358,6 +368,7 @@ test "getInstructionDataMap - MOV Decode Memory mode 8-bit" {
         .name = "mov",
         .mod = 0b01,
         .regOrMem = 0b000,
+        .length = 2,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(2, result.displacement.?.start);
@@ -369,6 +380,7 @@ test "getInstructionDataMap - MOV Decode Memory mode 16-bit" {
         .id = opcode_masks.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .mod = 0b10,
+        .length = 2,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(2, result.displacement.?.start);
@@ -380,6 +392,7 @@ test "getInstructionDataMap - MOV Immediate to register narrow" {
         .id = opcode_masks.OpcodeId.movImmediateToReg,
         .name = "mov",
         .wide = false,
+        .length = 1,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
@@ -391,6 +404,7 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
         .id = opcode_masks.OpcodeId.movImmediateToReg,
         .name = "mov",
         .wide = true,
+        .length = 1,
     };
     const result = getInstructionDataMap(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
@@ -403,6 +417,7 @@ test "getInstructionDataMap - MOV Immediate to register/memory, wide displacemen
         .name = "mov",
         .wide = false,
         .mod = 0b10,
+        .length = 2,
     };
 
     const result = getInstructionDataMap(decoded_opcode);
@@ -419,6 +434,7 @@ test "getInstructionDataMap - MOV Immediate to register/memory wide, no displace
         .name = "mov",
         .wide = true,
         .mod = 0b00,
+        .length = 2,
     };
 
     const result = getInstructionDataMap(decoded_opcode);
@@ -434,6 +450,7 @@ test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extensi
         .name = "mov",
         .sign = true,
         .wide = true,
+        .length = 2,
     };
 
     const result = getInstructionDataMap(decoded_opcode);
@@ -447,6 +464,7 @@ test "getInstructionDataMap - JNZ has signed displacement" {
     const decoded_opcode = opcode_masks.DecodedOpcode{
         .id = opcode_masks.OpcodeId.jmpIfNotZero,
         .name = "jnz",
+        .length = 1,
     };
 
     const result = getInstructionDataMap(decoded_opcode);
@@ -729,10 +747,10 @@ fn appendEffectiveAddress(
     }
 }
 
-fn buildRawInstructionFromBytes(bytes: [6]u8, length: u4) !RawInstruction {
+fn buildRawInstructionFromBytes(bytes: []const u8, length: u4) !RawInstruction {
     const opcode = try decodeOpcode(bytes[0..length]);
     return RawInstruction{
-        .base = bytes,
+        .base = bytes[0..],
         .opcode = opcode,
         .data_map = getInstructionDataMap(opcode),
     };
@@ -740,8 +758,9 @@ fn buildRawInstructionFromBytes(bytes: [6]u8, length: u4) !RawInstruction {
 
 test "decodeArgs - MOV Decode - Reg to Reg" {
     const allocator = std.testing.allocator;
+    const bytes = [_]u8{ 0b10001000, 0b11000001, 0, 0, 0, 0 };
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10001000, 0b11000001, 0, 0, 0, 0 },
+        &bytes,
         2,
     );
 
@@ -756,7 +775,7 @@ test "decodeArgs - MOV Decode - Reg to Reg" {
 test "decodeArgs - MOV Direct address" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10001000, 0b00000110, 0b1, 0b1, 0, 0 },
+        &[_]u8{ 0b10001000, 0b00000110, 0b1, 0b1, 0, 0 },
         2,
     );
 
@@ -771,7 +790,7 @@ test "decodeArgs - MOV Direct address" {
 test "decodeArgs - MOV reg or memory" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b1000_1011, 0b0100_0001, 0b1101_1011, 0b0, 0, 0 },
+        &[_]u8{ 0b1000_1011, 0b0100_0001, 0b1101_1011, 0b0, 0, 0 },
         2,
     );
 
@@ -786,7 +805,7 @@ test "decodeArgs - MOV reg or memory" {
 test "decodeArgs - MOV Decode - Immediate to register narrow positive" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
+        &[_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
         2,
     );
 
@@ -801,7 +820,7 @@ test "decodeArgs - MOV Decode - Immediate to register narrow positive" {
 test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
+        &[_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
         2,
     );
 
@@ -816,7 +835,7 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow positive" {
 test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10110001, 0b11111010, 0, 0, 0, 0 },
+        &[_]u8{ 0b10110001, 0b11111010, 0, 0, 0, 0 },
         2,
     );
 
@@ -831,7 +850,7 @@ test "decodeInstruction - MOV Decode - Immediate to register narrow negative" {
 test "decodeInstruction - MOV Decode - Immediate to register wide" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b10111001, 0b11111101, 0b11111111, 0, 0, 0 },
+        &[_]u8{ 0b10111001, 0b11111101, 0b11111111, 0, 0, 0 },
         2,
     );
 
@@ -846,7 +865,7 @@ test "decodeInstruction - MOV Decode - Immediate to register wide" {
 test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b11000110, 0b11, 7, 0, 0, 0 },
+        &[_]u8{ 0b11000110, 0b11, 7, 0, 0, 0 },
         2,
     );
 
@@ -861,7 +880,7 @@ test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
 test "decodeInstruction - MOV Decode - memory to accumulator narrow" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b1010_0000, 120, 0, 0, 0, 0 },
+        &[_]u8{ 0b1010_0000, 120, 0, 0, 0, 0 },
         2,
     );
 
@@ -876,7 +895,7 @@ test "decodeInstruction - MOV Decode - memory to accumulator narrow" {
 test "decodeInstruction - MOV Decode - accumulator to memory wide" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
+        &[_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
         2,
     );
 
@@ -893,7 +912,7 @@ test "decodeInstruction - ADD immediate to reg or mem" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
         // Note: 4th byte should be ignored due to sign extension
-        [_]u8{ 0b1000_0011, 0b1100_0110, 0b0000_0010, 0b1000_0011, 0, 0 },
+        &[_]u8{ 0b1000_0011, 0b1100_0110, 0b0000_0010, 0b1000_0011, 0, 0 },
         2,
     );
 
@@ -915,7 +934,7 @@ test "decodeInstruction - ADD immediate to reg or mem" {
 test "decodeInstruction - JNZ" {
     const allocator = std.testing.allocator;
     const raw_instruction = try buildRawInstructionFromBytes(
-        [_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
+        &[_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
         2,
     );
 

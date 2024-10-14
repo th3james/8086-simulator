@@ -58,6 +58,7 @@ pub const OpcodeDefinition = struct {
 pub const DecodedOpcode = struct {
     id: OpcodeId,
     name: []const u8,
+    length: u3,
     wide: ?bool = null,
     sign: bool = false,
     mod: ?u2 = null,
@@ -69,6 +70,7 @@ pub const DecodedOpcode = struct {
 pub const UnknownOpcode = DecodedOpcode{
     .id = OpcodeId.unknown,
     .name = "???",
+    .length = 1,
 };
 
 pub const OpcodeTable = [_]OpcodeDefinition{

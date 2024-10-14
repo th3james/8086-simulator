@@ -3,12 +3,19 @@ const assert = std.debug.assert;
 
 pub const Memory = struct {
     bytes: [1024 * 1024]u8,
-
-    pub fn read(self: *const Memory, address: u32) u8 {
-        assert(address < self.bytes.len);
-        return self.bytes[address];
-    }
 };
+
+pub const MemoryWindow = struct {
+    start: u32,
+    length: u32,
+};
+
+pub fn sliceMemory(memory: *const *Memory, start: u32, end: u32) []u8 {
+    assert(end > start);
+    const result = memory.*.bytes[start..end];
+    assert(result.len > 0);
+    return result;
+}
 
 pub fn loadFromFile(file_path: []const u8, out: *Memory) !u32 {
     const file = try std.fs.cwd().openFile(file_path, .{});
@@ -21,12 +28,17 @@ pub fn loadFromFile(file_path: []const u8, out: *Memory) !u32 {
     return @intCast(bytes_read);
 }
 
-test "Memory.read returns data at offset" {
+test "sliceMemory returns a window" {
     const allocator = std.testing.allocator;
-    const subject = try allocator.create(Memory);
-    defer _ = allocator.destroy(subject);
+    const mem = try allocator.create(Memory);
+    defer _ = allocator.destroy(mem);
 
-    subject.bytes[3] = 4;
+    mem.bytes[3] = 5;
+    mem.bytes[4] = 6;
 
-    try std.testing.expectEqual(subject.read(3), 4);
+    const result = sliceMemory(&mem, 3, 5);
+
+    try std.testing.expectEqual(result[0], 5);
+    try std.testing.expectEqual(result[1], 6);
+    try std.testing.expectEqual(result.len, 2);
 }

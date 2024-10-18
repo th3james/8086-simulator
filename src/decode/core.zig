@@ -1,6 +1,10 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const opcode_masks = @import("opcode_masks.zig");
 const register_names = @import("register_names.zig");
+
+pub const MAX_OPCODE_LENGTH = 2;
+pub const MAX_INSTRUCTION_LENGTH = 6;
 
 pub const InstructionErrors = error{ UnhandledRange, NoDisplacement, NoData };
 pub const RawInstruction = struct {
@@ -474,8 +478,9 @@ test "getInstructionDataMap - JNZ has signed displacement" {
     try std.testing.expectEqual(2, result.displacement.?.end);
 }
 
-pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
-    var length: u4 = 0;
+pub fn getInstructionLength(opcode_len: u4, data_map: opcode_masks.InstructionDataMap) u4 {
+    assert(opcode_len > 0);
+    var length = opcode_len;
 
     inline for (std.meta.fields(opcode_masks.InstructionDataMap)) |field| {
         if (@field(data_map, field.name)) |value| {
@@ -485,12 +490,14 @@ pub fn getInstructionLength(data_map: opcode_masks.InstructionDataMap) u4 {
         }
     }
 
+    assert(length >= opcode_len);
+    assert(length <= MAX_INSTRUCTION_LENGTH);
     return length;
 }
 
-test "getInstructionLength - returns 0 when there is no additional data" {
+test "getInstructionLength - returns opcode length when there is no additional data" {
     const in = opcode_masks.InstructionDataMap{};
-    try std.testing.expectEqual(0, getInstructionLength(in));
+    try std.testing.expectEqual(2, getInstructionLength(2, in));
 }
 
 test "getInstructionLength - returns the end of displacement when specified" {
@@ -498,7 +505,7 @@ test "getInstructionLength - returns the end of displacement when specified" {
         .start = 2,
         .end = 3,
     } };
-    try std.testing.expectEqual(3, getInstructionLength(in));
+    try std.testing.expectEqual(3, getInstructionLength(2, in));
 }
 
 test "getInstructionLength - returns the end of data when specified" {
@@ -506,7 +513,7 @@ test "getInstructionLength - returns the end of data when specified" {
         .start = 1,
         .end = 2,
     } };
-    try std.testing.expectEqual(2, getInstructionLength(in));
+    try std.testing.expectEqual(2, getInstructionLength(1, in));
 }
 
 test "getInstructionLength - returns the maximum end value when multiple fields are specified" {
@@ -520,7 +527,7 @@ test "getInstructionLength - returns the maximum end value when multiple fields 
             .end = 2,
         },
     };
-    try std.testing.expectEqual(3, getInstructionLength(in));
+    try std.testing.expectEqual(3, getInstructionLength(1, in));
 }
 
 pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !InstructionArgs {

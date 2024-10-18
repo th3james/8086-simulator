@@ -30,19 +30,18 @@ pub fn main() !void {
 }
 
 fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) !opcode_masks.DecodedOpcode {
-    const MAX_OPCODE_LENGTH = 2;
-    var opcode_length: u3 = 1;
-    return while (opcode_length <= MAX_OPCODE_LENGTH) {
+    var opcode_length: u3 = 0;
+    return while (opcode_length < decode.MAX_OPCODE_LENGTH) {
+        opcode_length += 1;
         const opcode_end = start_addr + opcode_length;
         if (opcode_end <= limit_addr) {
             const opcode_bytes = memory.sliceMemory(&mem, start_addr, opcode_end);
             assert(opcode_bytes.len > 0);
-            assert(opcode_bytes.len <= MAX_OPCODE_LENGTH);
+            assert(opcode_bytes.len <= decode.MAX_OPCODE_LENGTH);
 
             // if this errors, loop to read more bytes
             const result = decode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
                 decode.Errors.InsufficientBytes => {
-                    opcode_length += 1;
                     continue;
                 },
             };
@@ -72,19 +71,15 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
         const opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
 
         const data_map = decode.getInstructionDataMap(opcode);
-        const full_instruction_length = decode.getInstructionLength(data_map);
 
-        const instruction_end = memory_address + @max(
-            opcode.length,
-            full_instruction_length,
-        );
+        const instruction_end = memory_address + decode.getInstructionLength(opcode.length, data_map);
         assert(instruction_end > memory_address);
+        assert((instruction_end - memory_address) <= decode.MAX_INSTRUCTION_LENGTH);
+
         const instruction_bytes = if (instruction_end <= program_len)
             memory.sliceMemory(&mem, memory_address, instruction_end)
         else
             return InvalidBinaryErrors.IncompleteInstruction;
-        assert((instruction_end - memory_address) > 0);
-        assert((instruction_end - memory_address) <= 6);
         memory_address = instruction_end;
 
         const raw_instruction = decode.RawInstruction{
@@ -93,16 +88,9 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
             .data_map = data_map,
         };
 
-        if (false) { //raw_instruction.opcode.id == .cmpImmediateToRegOrMem) {
-            std.debug.print("Input {b}\n", .{raw_instruction.base});
-            std.debug.print("\t{any}\n", .{raw_instruction.opcode});
-            std.debug.print("\t{any}\n", .{raw_instruction.data_map});
-        }
-
         const instruction_args = try decode.decodeArgs(arena_allocator, raw_instruction);
 
         const args_str = try std.mem.join(arena_allocator, ", ", instruction_args.args);
-        // std.debug.print("Result: {s} {s}\n", .{ opcode.name, args_str });
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
     }
 

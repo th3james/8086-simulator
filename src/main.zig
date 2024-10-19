@@ -41,6 +41,7 @@ fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) 
 
             break decode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
                 decode.Errors.InsufficientBytes => {
+                    // loop to get more bytes
                     continue;
                 },
             };

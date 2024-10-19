@@ -127,8 +127,11 @@ const InstructionArgs = struct {
 pub const Errors = error{InsufficientBytes};
 
 pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
+    assert(bytes.len > 0);
+    assert(bytes.len <= MAX_OPCODE_LENGTH);
+
     const identifier: u16 = switch (bytes.len) {
-        1 => @as(u16, bytes[0]),
+        1 => @as(u16, bytes[0]) << 8,
         2 => @as(u16, bytes[0]) << 8 | bytes[1], // TODO may be wrong
         else => {
             return opcode_masks.UnknownOpcode;
@@ -164,7 +167,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
             return decoded_opcode;
         }
     }
-    if (bytes.len == 2) {
+    if (bytes.len == MAX_OPCODE_LENGTH) {
         return opcode_masks.UnknownOpcode;
     } else {
         return Errors.InsufficientBytes;

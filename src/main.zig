@@ -51,6 +51,18 @@ fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) 
     } else unreachable;
 }
 
+test "decodeOpcodeAtAddress - given valid 1-byte instruction address returns opcode" {
+    const allocator = std.testing.allocator;
+    const mem = try allocator.create(memory.Memory);
+    defer _ = allocator.destroy(mem);
+
+    mem.bytes[0] = 0b1011_0000; // MOV immediate to register
+
+    const result = try decodeOpcodeAtAddress(mem, 0, 1);
+
+    try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.movImmediateToReg);
+}
+
 fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: u32) !void {
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);

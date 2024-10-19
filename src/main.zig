@@ -35,18 +35,15 @@ fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) 
         opcode_length += 1;
         const opcode_end = start_addr + opcode_length;
         if (opcode_end <= limit_addr) {
-            const opcode_bytes = memory.sliceMemory(&mem, start_addr, opcode_end);
+            const opcode_bytes = memory.sliceMemory(mem, start_addr, opcode_end);
             assert(opcode_bytes.len > 0);
             assert(opcode_bytes.len <= decode.MAX_OPCODE_LENGTH);
 
-            // if this errors, loop to read more bytes
-            const result = decode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
+            break decode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
                 decode.Errors.InsufficientBytes => {
                     continue;
                 },
             };
-
-            break result;
         } else {
             return InvalidBinaryErrors.IncompleteInstruction;
         }
@@ -77,7 +74,7 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
         assert((instruction_end - memory_address) <= decode.MAX_INSTRUCTION_LENGTH);
 
         const instruction_bytes = if (instruction_end <= program_len)
-            memory.sliceMemory(&mem, memory_address, instruction_end)
+            memory.sliceMemory(mem, memory_address, instruction_end)
         else
             return InvalidBinaryErrors.IncompleteInstruction;
         memory_address = instruction_end;

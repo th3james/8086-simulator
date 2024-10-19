@@ -10,7 +10,7 @@ pub const MemoryWindow = struct {
     length: u32,
 };
 
-pub fn sliceMemory(memory: *const *Memory, start: u32, end: u32) []u8 {
+pub fn sliceMemory(memory: *Memory, start: u32, end: u32) []u8 {
     assert(end > start);
     const result = memory.*.bytes[start..end];
     assert(result.len > 0);
@@ -36,7 +36,7 @@ test "sliceMemory returns a window" {
     mem.bytes[3] = 5;
     mem.bytes[4] = 6;
 
-    const result = sliceMemory(&mem, 3, 5);
+    const result = sliceMemory(mem, 3, 5);
 
     try std.testing.expectEqual(result[0], 5);
     try std.testing.expectEqual(result[1], 6);

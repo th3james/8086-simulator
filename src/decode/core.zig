@@ -124,7 +124,7 @@ const InstructionArgs = struct {
     }
 };
 
-pub const Errors = error{InsufficientBytes};
+pub const Errors = error{ InsufficientBytes, UnrecognisedOpcode };
 
 pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
     assert(bytes.len > 0);
@@ -133,9 +133,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
     const identifier: u16 = switch (bytes.len) {
         1 => @as(u16, bytes[0]) << 8,
         2 => @as(u16, bytes[0]) << 8 | bytes[1],
-        else => {
-            return opcode_masks.UnknownOpcode;
-        },
+        else => unreachable,
     };
 
     // TODO comptime loop?
@@ -167,22 +165,20 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
             return decoded_opcode;
         }
     }
-    if (bytes.len == MAX_OPCODE_LENGTH) {
-        return opcode_masks.UnknownOpcode;
-    } else {
+    return if (bytes.len == MAX_OPCODE_LENGTH)
+        return Errors.UnrecognisedOpcode
+    else
         return Errors.InsufficientBytes;
-    }
 }
 
 test "decodeOpcode - Unknown opcode with one byte returns InsufficientBytes error" {
-    const result = decodeOpcode(&[_]u8{0b00000000});
+    const result = decodeOpcode(&[_]u8{0});
     try std.testing.expectError(Errors.InsufficientBytes, result);
 }
 
-test "decodeOpcode - Unknown opcode with max bytes returns Unknown" {
-    const result = try decodeOpcode(&[_]u8{ 0, 0, 0 });
-    try std.testing.expectEqual(opcode_masks.OpcodeId.unknown, result.id);
-    try std.testing.expectEqualStrings("???", result.name);
+test "decodeOpcode - Unknown opcode with max byte returns UnrecognisedOpcode error" {
+    const result = decodeOpcode(&[_]u8{ 0b11111111, 0b11 });
+    try std.testing.expectError(Errors.UnrecognisedOpcode, result);
 }
 
 test "decodeOpcode - MOV Memory mode, no displacement" {
@@ -325,9 +321,6 @@ pub fn getInstructionDataMap(decoded_opcode: opcode_masks.DecodedOpcode) opcode_
                 .start = 1,
                 .end = 2,
             };
-        },
-        else => {
-            std.debug.print("TODO data_map not implemented for instruction {any} \n", .{decoded_opcode.id});
         },
     }
     return result;
@@ -721,12 +714,6 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: RawInstruction) !Instructio
             try args.append(try std.fmt.allocPrint(allocator, "{d}", .{
                 try raw.getDisplacement(),
             }));
-            return InstructionArgs{ .args = try args.toOwnedSlice() };
-        },
-
-        opcode_masks.OpcodeId.unknown => {
-            const raw_bytes = try std.fmt.allocPrint(allocator, "{b}", .{raw.base});
-            try args.append(raw_bytes);
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
     }

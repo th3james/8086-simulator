@@ -33,7 +33,6 @@ pub const OpcodeId = enum {
     loopIfZero,
     loopIfNotZero,
     jmpIfCxZero,
-    unknown,
 };
 
 pub const FieldDefinition = struct {
@@ -65,12 +64,6 @@ pub const DecodedOpcode = struct {
     reg: ?u3 = null,
     regOrMem: ?u3 = null,
     regIsDestination: ?bool = null,
-};
-
-pub const UnknownOpcode = DecodedOpcode{
-    .id = OpcodeId.unknown,
-    .name = "???",
-    .length = 1,
 };
 
 pub const OpcodeTable = [_]OpcodeDefinition{

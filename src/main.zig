@@ -44,6 +44,7 @@ fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) 
                     // loop to get more bytes
                     continue;
                 },
+                else => err,
             };
         } else {
             return InvalidBinaryErrors.IncompleteInstruction;

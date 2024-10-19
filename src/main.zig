@@ -64,6 +64,57 @@ test "decodeOpcodeAtAddress - given valid 1-byte instruction address returns opc
     try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.movImmediateToReg);
 }
 
+test "decodeOpcodeAtAddress - given valid 2-byte instruction address at limit address it returns opcode" {
+    const allocator = std.testing.allocator;
+    const mem = try allocator.create(memory.Memory);
+    defer _ = allocator.destroy(mem);
+
+    mem.bytes[0] = 0b0000_0000; // Add register to mem or register
+    mem.bytes[1] = 0b0011_0000;
+
+    const result = try decodeOpcodeAtAddress(mem, 0, 2);
+
+    try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.addRegOrMemToEither);
+}
+
+test "decodeOpcodeAtAddress - given valid 2-byte instruction address not at limit it returns opcode" {
+    const allocator = std.testing.allocator;
+    const mem = try allocator.create(memory.Memory);
+    defer _ = allocator.destroy(mem);
+
+    mem.bytes[0] = 0b0000_0000; // Add register to mem or register
+    mem.bytes[1] = 0b0011_0000;
+
+    const result = try decodeOpcodeAtAddress(mem, 0, 200);
+
+    try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.addRegOrMemToEither);
+}
+
+test "decodeOpcodeAtAddress - unknown opcode returns error" {
+    const allocator = std.testing.allocator;
+    const mem = try allocator.create(memory.Memory);
+    defer _ = allocator.destroy(mem);
+
+    mem.bytes[0] = 0b1111_1111; // Not a valid instruction
+    mem.bytes[1] = 0b1111_1111;
+
+    const result = decodeOpcodeAtAddress(mem, 0, 2);
+
+    try std.testing.expectError(decode.Errors.UnrecognisedOpcode, result);
+}
+
+test "decodeOpcodeAtAddress - an incomplete instruction it returns error" {
+    const allocator = std.testing.allocator;
+    const mem = try allocator.create(memory.Memory);
+    defer _ = allocator.destroy(mem);
+
+    mem.bytes[0] = 0b0000_0000; // Add register to mem or register
+
+    const result = decodeOpcodeAtAddress(mem, 0, 1);
+
+    try std.testing.expectError(InvalidBinaryErrors.IncompleteInstruction, result);
+}
+
 fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: u32) !void {
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);

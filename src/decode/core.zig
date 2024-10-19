@@ -132,7 +132,7 @@ pub fn decodeOpcode(bytes: []const u8) !opcode_masks.DecodedOpcode {
 
     const identifier: u16 = switch (bytes.len) {
         1 => @as(u16, bytes[0]) << 8,
-        2 => @as(u16, bytes[0]) << 8 | bytes[1], // TODO may be wrong
+        2 => @as(u16, bytes[0]) << 8 | bytes[1],
         else => {
             return opcode_masks.UnknownOpcode;
         },

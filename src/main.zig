@@ -1,8 +1,12 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const decode = @import("decode/core.zig");
-const opcode_masks = @import("decode/opcode_masks.zig");
+
 const memory = @import("memory.zig");
+const opcode = @import("decode/opcode.zig");
+const instruction_data = @import("decode/instruction_data.zig");
+const decode_errors = @import("decode/errors.zig");
+const raw_instruction = @import("decode/raw_instruction.zig");
+const decode_args = @import("decode/args.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
 
@@ -29,18 +33,18 @@ pub fn main() !void {
     try disassemble(&allocator, emu_mem, program_len);
 }
 
-fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) !opcode_masks.DecodedOpcode {
+fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) !opcode.DecodedOpcode {
     var opcode_length: u3 = 0;
-    return while (opcode_length < decode.MAX_OPCODE_LENGTH) {
+    return while (opcode_length < opcode.MAX_OPCODE_LENGTH) {
         opcode_length += 1;
         const opcode_end = start_addr + opcode_length;
         if (opcode_end <= limit_addr) {
             const opcode_bytes = memory.sliceMemory(mem, start_addr, opcode_end);
             assert(opcode_bytes.len > 0);
-            assert(opcode_bytes.len <= decode.MAX_OPCODE_LENGTH);
+            assert(opcode_bytes.len <= opcode.MAX_OPCODE_LENGTH);
 
-            break decode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
-                decode.Errors.InsufficientBytes => {
+            break opcode.decodeOpcode(opcode_bytes) catch |err| switch (err) {
+                opcode.Errors.InsufficientBytes => {
                     // loop to get more bytes
                     continue;
                 },
@@ -61,7 +65,7 @@ test "decodeOpcodeAtAddress - given valid 1-byte instruction address returns opc
 
     const result = try decodeOpcodeAtAddress(mem, 0, 1);
 
-    try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.movImmediateToReg);
+    try std.testing.expectEqual(result.id, opcode.OpcodeId.movImmediateToReg);
 }
 
 test "decodeOpcodeAtAddress - given valid 2-byte instruction address at limit address it returns opcode" {
@@ -74,7 +78,7 @@ test "decodeOpcodeAtAddress - given valid 2-byte instruction address at limit ad
 
     const result = try decodeOpcodeAtAddress(mem, 0, 2);
 
-    try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.addRegOrMemToEither);
+    try std.testing.expectEqual(result.id, opcode.OpcodeId.addRegOrMemToEither);
 }
 
 test "decodeOpcodeAtAddress - given valid 2-byte instruction address not at limit it returns opcode" {
@@ -87,7 +91,7 @@ test "decodeOpcodeAtAddress - given valid 2-byte instruction address not at limi
 
     const result = try decodeOpcodeAtAddress(mem, 0, 200);
 
-    try std.testing.expectEqual(result.id, opcode_masks.OpcodeId.addRegOrMemToEither);
+    try std.testing.expectEqual(result.id, opcode.OpcodeId.addRegOrMemToEither);
 }
 
 test "decodeOpcodeAtAddress - unknown opcode returns error" {
@@ -100,7 +104,7 @@ test "decodeOpcodeAtAddress - unknown opcode returns error" {
 
     const result = decodeOpcodeAtAddress(mem, 0, 2);
 
-    try std.testing.expectError(decode.Errors.UnrecognisedOpcode, result);
+    try std.testing.expectError(opcode.Errors.UnrecognisedOpcode, result);
 }
 
 test "decodeOpcodeAtAddress - an incomplete instruction it returns error" {
@@ -130,13 +134,13 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
         _ = arena.reset(.retain_capacity);
         const arena_allocator = arena.allocator();
 
-        const opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
+        const the_opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
 
-        const data_map = decode.getInstructionDataMap(opcode);
+        const data_map = instruction_data.getInstructionDataMap(the_opcode);
 
-        const instruction_end = memory_address + decode.getInstructionLength(opcode.length, data_map);
+        const instruction_end = memory_address + instruction_data.getInstructionLength(the_opcode.length, data_map);
         assert(instruction_end > memory_address);
-        assert((instruction_end - memory_address) <= decode.MAX_INSTRUCTION_LENGTH);
+        assert((instruction_end - memory_address) <= instruction_data.MAX_INSTRUCTION_LENGTH);
 
         const instruction_bytes = if (instruction_end <= program_len)
             memory.sliceMemory(mem, memory_address, instruction_end)
@@ -144,16 +148,16 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
             return InvalidBinaryErrors.IncompleteInstruction;
         memory_address = instruction_end;
 
-        const raw_instruction = decode.RawInstruction{
+        const the_raw_instruction = raw_instruction.RawInstruction{
             .base = instruction_bytes,
-            .opcode = opcode,
+            .opcode = the_opcode,
             .data_map = data_map,
         };
 
-        const instruction_args = try decode.decodeArgs(arena_allocator, raw_instruction);
+        const instruction_args = try decode_args.decodeArgs(arena_allocator, the_raw_instruction);
 
         const args_str = try std.mem.join(arena_allocator, ", ", instruction_args.args);
-        try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
+        try stdout.print("{s} {s}\n", .{ the_opcode.name, args_str });
     }
 
     try bw.flush();

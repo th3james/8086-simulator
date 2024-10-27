@@ -3,7 +3,7 @@ const assert = std.debug.assert;
 
 const opcode = @import("opcode.zig");
 const instruction_data = @import("instruction_data.zig");
-const raw_instruction = @import("raw_instruction.zig");
+const instruction = @import("instruction.zig");
 const register_names = @import("register_names.zig");
 const errors = @import("errors.zig");
 
@@ -18,7 +18,7 @@ const InstructionArgs = struct {
     }
 };
 
-pub fn decodeArgs(allocator: std.mem.Allocator, raw: raw_instruction.RawInstruction) !InstructionArgs {
+pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !InstructionArgs {
     var args = std.ArrayList([]const u8).init(allocator);
     defer args.deinit();
 
@@ -236,9 +236,9 @@ fn appendEffectiveAddress(
     }
 }
 
-fn buildRawInstructionFromBytes(bytes: []const u8, length: u4) !raw_instruction.RawInstruction {
+fn buildRawInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruction {
     const result = try opcode.decodeOpcode(bytes[0..length]);
-    return raw_instruction.RawInstruction{
+    return instruction.Instruction{
         .base = bytes[0..],
         .opcode = result,
         .data_map = instruction_data.getInstructionDataMap(result),

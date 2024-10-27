@@ -3,12 +3,12 @@ const opcode = @import("opcode.zig");
 const instruction_data = @import("instruction_data.zig");
 const errors = @import("errors.zig");
 
-pub const RawInstruction = struct {
+pub const Instruction = struct {
     base: []const u8,
     opcode: opcode.DecodedOpcode,
     data_map: instruction_data.InstructionDataMap,
 
-    fn extractValue(self: *const RawInstruction, field: instruction_data.InstructionField) errors.InstructionErrors!i16 {
+    fn extractValue(self: *const Instruction, field: instruction_data.InstructionField) errors.InstructionErrors!i16 {
         if (field.end - field.start == 1) {
             return @as(i16, @as(i8, @bitCast(self.base[field.start])));
         } else if (field.end - field.start == 2) {
@@ -18,12 +18,12 @@ pub const RawInstruction = struct {
         }
     }
 
-    pub fn getDisplacement(self: *const RawInstruction) errors.InstructionErrors!i16 {
+    pub fn getDisplacement(self: *const Instruction) errors.InstructionErrors!i16 {
         const displacement_map = self.data_map.displacement orelse return errors.InstructionErrors.NoDisplacement;
         return self.extractValue(displacement_map);
     }
 
-    pub fn getData(self: *const RawInstruction) errors.InstructionErrors!i16 {
+    pub fn getData(self: *const Instruction) errors.InstructionErrors!i16 {
         const data_map = self.data_map.data orelse return errors.InstructionErrors.NoData;
         return self.extractValue(data_map);
     }
@@ -31,7 +31,7 @@ pub const RawInstruction = struct {
 
 test "RawInstruction.getDisplacement - errors when no data map" {
     var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
-    const in = RawInstruction{
+    const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
         .data_map = .{},
@@ -41,7 +41,7 @@ test "RawInstruction.getDisplacement - errors when no data map" {
 
 test "RawInstruction.getDisplacement - positive narrow" {
     var base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 };
-    const in = RawInstruction{
+    const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
         .data_map = .{
@@ -56,7 +56,7 @@ test "RawInstruction.getDisplacement - positive narrow" {
 
 test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
     var base = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 };
-    const in = RawInstruction{
+    const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{
@@ -71,7 +71,7 @@ test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
 
 test "RawInstruction.getDisplacement - wide" {
     var base = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 };
-    const in = RawInstruction{
+    const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{
@@ -86,7 +86,7 @@ test "RawInstruction.getDisplacement - wide" {
 
 test "RawInstruction.getData - errors when no data map" {
     var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
-    const in = RawInstruction{
+    const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{},
@@ -96,7 +96,7 @@ test "RawInstruction.getData - errors when no data map" {
 
 test "RawInstruction.getData - narrow" {
     var base = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 };
-    const in = RawInstruction{
+    const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .data_map = .{

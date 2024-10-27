@@ -5,7 +5,7 @@ const memory = @import("memory.zig");
 const opcode = @import("decode/opcode.zig");
 const instruction_data = @import("decode/instruction_data.zig");
 const decode_errors = @import("decode/errors.zig");
-const raw_instruction = @import("decode/raw_instruction.zig");
+const instruction = @import("decode/instruction.zig");
 const decode_args = @import("decode/args.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
@@ -148,7 +148,7 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
             return InvalidBinaryErrors.IncompleteInstruction;
         memory_address = instruction_end;
 
-        const the_raw_instruction = raw_instruction.RawInstruction{
+        const the_raw_instruction = instruction.Instruction{
             .base = instruction_bytes,
             .opcode = the_opcode,
             .data_map = data_map,

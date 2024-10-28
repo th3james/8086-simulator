@@ -162,3 +162,7 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
 
     try bw.flush();
 }
+
+test {
+    _ = std.testing.refAllDecls(@This());
+}

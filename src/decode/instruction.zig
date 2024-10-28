@@ -1,11 +1,11 @@
 const std = @import("std");
-const opcode = @import("opcode.zig");
+const opcodes = @import("opcodes.zig");
 const instruction_data = @import("instruction_data.zig");
 const errors = @import("errors.zig");
 
 pub const Instruction = struct {
     base: []const u8,
-    opcode: opcode.DecodedOpcode,
+    opcode: opcodes.DecodedOpcode,
     data_map: instruction_data.InstructionDataMap,
 
     fn extractValue(self: *const Instruction, field: instruction_data.InstructionField) errors.InstructionErrors!i16 {

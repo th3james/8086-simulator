@@ -1,7 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-const opcode = @import("opcode.zig");
+const opcodes = @import("opcodes.zig");
 const instruction_data = @import("instruction_data.zig");
 const instruction = @import("instruction.zig");
 const register_names = @import("register_names.zig");
@@ -23,10 +23,10 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
     defer args.deinit();
 
     switch (raw.opcode.id) {
-        opcode.OpcodeId.movRegOrMemToFromReg,
-        opcode.OpcodeId.addRegOrMemToEither,
-        opcode.OpcodeId.subRegOrMemToEither,
-        opcode.OpcodeId.cmpRegOrMemToReg,
+        opcodes.OpcodeId.movRegOrMemToFromReg,
+        opcodes.OpcodeId.addRegOrMemToEither,
+        opcodes.OpcodeId.subRegOrMemToEither,
+        opcodes.OpcodeId.cmpRegOrMemToReg,
         => {
             // TODO improve optional unwraps
             switch (raw.opcode.mod.?) {
@@ -68,10 +68,10 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode.OpcodeId.movImmediateToRegOrMem,
-        opcode.OpcodeId.addImmediateToRegOrMem,
-        opcode.OpcodeId.subImmediateToRegOrMem,
-        opcode.OpcodeId.cmpImmediateToRegOrMem,
+        opcodes.OpcodeId.movImmediateToRegOrMem,
+        opcodes.OpcodeId.addImmediateToRegOrMem,
+        opcodes.OpcodeId.subImmediateToRegOrMem,
+        opcodes.OpcodeId.cmpImmediateToRegOrMem,
         => {
             switch (raw.opcode.mod.?) {
                 0b00 => { // Memory mode, no displacement
@@ -133,7 +133,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode.OpcodeId.movImmediateToReg => {
+        opcodes.OpcodeId.movImmediateToReg => {
             try args.append(try allocator.dupe(u8, register_names.registerName(raw.opcode.reg.?, raw.opcode.wide.?)));
 
             if (raw.opcode.wide.?) {
@@ -149,7 +149,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode.OpcodeId.memoryToAccumulator => {
+        opcodes.OpcodeId.memoryToAccumulator => {
             // TODO handle wide
             try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
             try args.append(try std.fmt.allocPrint(allocator, "[{d}]", .{
@@ -158,7 +158,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode.OpcodeId.accumulatorToMemory => {
+        opcodes.OpcodeId.accumulatorToMemory => {
             try args.append(try std.fmt.allocPrint(allocator, "[{d}]", .{
                 try raw.getData(),
             }));
@@ -167,9 +167,9 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
             return InstructionArgs{ .args = try args.toOwnedSlice() };
         },
 
-        opcode.OpcodeId.addImmediateToAccumulator,
-        opcode.OpcodeId.subImmediateToAccumulator,
-        opcode.OpcodeId.cmpImmediateWithAccumulator,
+        opcodes.OpcodeId.addImmediateToAccumulator,
+        opcodes.OpcodeId.subImmediateToAccumulator,
+        opcodes.OpcodeId.cmpImmediateWithAccumulator,
         => {
             if (raw.opcode.wide.?) {
                 try args.append(try std.fmt.allocPrint(allocator, "ax", .{}));
@@ -214,30 +214,30 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
 fn appendEffectiveAddress(
     allocator: std.mem.Allocator,
     args: *std.ArrayList([]const u8),
-    the_opcode: opcode.DecodedOpcode,
+    opcode: opcodes.DecodedOpcode,
     displacement: i16,
 ) !void {
     const effectiveAddress = register_names.effectiveAddressRegisters(
-        the_opcode.regOrMem.?, // TODO can this unwrap be avoided?
+        opcode.regOrMem.?, // TODO can this unwrap be avoided?
         displacement,
     );
-    if (the_opcode.regIsDestination orelse false) {
+    if (opcode.regIsDestination orelse false) {
         try args.append(try allocator.dupe(
             u8,
-            register_names.registerName(the_opcode.reg.?, the_opcode.wide.?),
+            register_names.registerName(opcode.reg.?, opcode.wide.?),
         ));
         try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
     } else {
         try args.append(try register_names.renderEffectiveAddress(allocator, effectiveAddress));
         try args.append(try allocator.dupe(
             u8,
-            register_names.registerName(the_opcode.reg.?, the_opcode.wide.?),
+            register_names.registerName(opcode.reg.?, opcode.wide.?),
         ));
     }
 }
 
 fn buildRawInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruction {
-    const result = try opcode.decodeOpcode(bytes[0..length]);
+    const result = try opcodes.decodeOpcode(bytes[0..length]);
     return instruction.Instruction{
         .base = bytes[0..],
         .opcode = result,
@@ -407,7 +407,7 @@ test "decodeInstruction - ADD immediate to reg or mem" {
     );
 
     try std.testing.expectEqualStrings("add", the_raw_instruction.opcode.name);
-    try std.testing.expectEqual(opcode.OpcodeId.addImmediateToRegOrMem, the_raw_instruction.opcode.id);
+    try std.testing.expectEqual(opcodes.OpcodeId.addImmediateToRegOrMem, the_raw_instruction.opcode.id);
     try std.testing.expectEqual(true, the_raw_instruction.opcode.sign);
     try std.testing.expectEqual(true, the_raw_instruction.opcode.wide);
     try std.testing.expectEqual(0b11, the_raw_instruction.opcode.mod);

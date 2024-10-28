@@ -1,6 +1,6 @@
 const std = @import("std");
 const assert = std.debug.assert;
-const opcode = @import("opcode.zig");
+const opcodes = @import("opcodes.zig");
 
 pub const MAX_INSTRUCTION_LENGTH = 6;
 
@@ -14,7 +14,7 @@ pub const InstructionDataMap = struct {
     data: ?InstructionField = null,
 };
 
-pub fn getInstructionDataMap(decoded_opcode: opcode.DecodedOpcode) InstructionDataMap {
+pub fn getInstructionDataMap(decoded_opcode: opcodes.DecodedOpcode) InstructionDataMap {
     var result = InstructionDataMap{};
     switch (decoded_opcode.id) {
         .movRegOrMemToFromReg,
@@ -110,8 +110,8 @@ pub fn getInstructionDataMap(decoded_opcode: opcode.DecodedOpcode) InstructionDa
 }
 
 test "getInstructionDataMap - MOV Memory mode, no displacement" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movRegOrMemToFromReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .regOrMem = 0b000,
         .length = 2,
@@ -121,8 +121,8 @@ test "getInstructionDataMap - MOV Memory mode, no displacement" {
 }
 
 test "getInstructionDataMap - MOV Memory mode, direct address" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movRegOrMemToFromReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .mod = 0b00,
         .regOrMem = 0b110,
@@ -134,8 +134,8 @@ test "getInstructionDataMap - MOV Memory mode, direct address" {
 }
 
 test "getInstructionDataMap - Reg-to-reg MOV Decode" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movRegOrMemToFromReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .mod = 0b11,
         .regOrMem = 0b110,
@@ -146,8 +146,8 @@ test "getInstructionDataMap - Reg-to-reg MOV Decode" {
 }
 
 test "getInstructionDataMap - MOV Decode Memory mode 8-bit" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movRegOrMemToFromReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .mod = 0b01,
         .regOrMem = 0b000,
@@ -159,8 +159,8 @@ test "getInstructionDataMap - MOV Decode Memory mode 8-bit" {
 }
 
 test "getInstructionDataMap - MOV Decode Memory mode 16-bit" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movRegOrMemToFromReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movRegOrMemToFromReg,
         .name = "mov",
         .mod = 0b10,
         .length = 2,
@@ -171,8 +171,8 @@ test "getInstructionDataMap - MOV Decode Memory mode 16-bit" {
 }
 
 test "getInstructionDataMap - MOV Immediate to register narrow" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movImmediateToReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movImmediateToReg,
         .name = "mov",
         .wide = false,
         .length = 1,
@@ -183,8 +183,8 @@ test "getInstructionDataMap - MOV Immediate to register narrow" {
 }
 
 test "getInstructionDataMap - MOV Immediate to register wide" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movImmediateToReg,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movImmediateToReg,
         .name = "mov",
         .wide = true,
         .length = 1,
@@ -195,8 +195,8 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
 }
 
 test "getInstructionDataMap - MOV Immediate to register/memory, wide displacement, narrow data" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movImmediateToRegOrMem,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movImmediateToRegOrMem,
         .name = "mov",
         .wide = false,
         .mod = 0b10,
@@ -212,8 +212,8 @@ test "getInstructionDataMap - MOV Immediate to register/memory, wide displacemen
 }
 
 test "getInstructionDataMap - MOV Immediate to register/memory wide, no displacement, wide data" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.movImmediateToRegOrMem,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.movImmediateToRegOrMem,
         .name = "mov",
         .wide = true,
         .mod = 0b00,
@@ -228,8 +228,8 @@ test "getInstructionDataMap - MOV Immediate to register/memory wide, no displace
 }
 
 test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extension" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.addImmediateToRegOrMem,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.addImmediateToRegOrMem,
         .name = "mov",
         .sign = true,
         .wide = true,
@@ -244,8 +244,8 @@ test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extensi
 }
 
 test "getInstructionDataMap - JNZ has signed displacement" {
-    const decoded_opcode = opcode.DecodedOpcode{
-        .id = opcode.OpcodeId.jmpIfNotZero,
+    const decoded_opcode = opcodes.DecodedOpcode{
+        .id = opcodes.OpcodeId.jmpIfNotZero,
         .name = "jnz",
         .length = 1,
     };

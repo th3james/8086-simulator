@@ -136,9 +136,9 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
 
         const opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
 
-        const data_map = instruction_layout.getInstructionDataMap(opcode);
+        const layout = instruction_layout.getInstructionLayout(opcode);
 
-        const instruction_end = memory_address + instruction_layout.getInstructionLength(opcode.length, data_map);
+        const instruction_end = memory_address + instruction_layout.getInstructionLength(opcode.length, layout);
         assert(instruction_end > memory_address);
         assert((instruction_end - memory_address) <= instruction_layout.MAX_INSTRUCTION_LENGTH);
 
@@ -151,7 +151,7 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
         const the_raw_instruction = instruction.Instruction{
             .base = instruction_bytes,
             .opcode = opcode,
-            .data_map = data_map,
+            .layout = layout,
         };
 
         const instruction_args = try decode_args.decodeArgs(arena_allocator, the_raw_instruction);

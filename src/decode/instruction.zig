@@ -6,7 +6,7 @@ const errors = @import("errors.zig");
 pub const Instruction = struct {
     base: []const u8,
     opcode: opcodes.DecodedOpcode,
-    data_map: instruction_layout.InstructionDataMap, // TODO rename 'layout'?
+    layout: instruction_layout.InstructionLayout,
 
     fn extractValue(self: *const Instruction, field: instruction_layout.InstructionField) errors.InstructionErrors!i16 {
         if (field.end - field.start == 1) {
@@ -19,12 +19,12 @@ pub const Instruction = struct {
     }
 
     pub fn getDisplacement(self: *const Instruction) errors.InstructionErrors!i16 {
-        const displacement_map = self.data_map.displacement orelse return errors.InstructionErrors.NoDisplacement;
+        const displacement_map = self.layout.displacement orelse return errors.InstructionErrors.NoDisplacement;
         return self.extractValue(displacement_map);
     }
 
     pub fn getData(self: *const Instruction) errors.InstructionErrors!i16 {
-        const data_map = self.data_map.data orelse return errors.InstructionErrors.NoData;
+        const data_map = self.layout.data orelse return errors.InstructionErrors.NoData;
         return self.extractValue(data_map);
     }
 };
@@ -34,7 +34,7 @@ test "RawInstruction.getDisplacement - errors when no data map" {
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
-        .data_map = .{},
+        .layout = .{},
     };
     try std.testing.expectError(errors.InstructionErrors.NoDisplacement, in.getDisplacement());
 }
@@ -44,7 +44,7 @@ test "RawInstruction.getDisplacement - positive narrow" {
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
-        .data_map = .{
+        .layout = .{
             .displacement = .{
                 .start = 1,
                 .end = 2,
@@ -59,7 +59,7 @@ test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
-        .data_map = .{
+        .layout = .{
             .displacement = .{
                 .start = 1,
                 .end = 2,
@@ -74,7 +74,7 @@ test "RawInstruction.getDisplacement - wide" {
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
-        .data_map = .{
+        .layout = .{
             .displacement = .{
                 .start = 1,
                 .end = 3,
@@ -89,7 +89,7 @@ test "RawInstruction.getData - errors when no data map" {
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
-        .data_map = .{},
+        .layout = .{},
     };
     try std.testing.expectError(errors.InstructionErrors.NoData, in.getData());
 }
@@ -99,7 +99,7 @@ test "RawInstruction.getData - narrow" {
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
-        .data_map = .{
+        .layout = .{
             .data = .{
                 .start = 1,
                 .end = 2,

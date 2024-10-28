@@ -241,7 +241,7 @@ fn buildRawInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Inst
     return instruction.Instruction{
         .base = bytes[0..],
         .opcode = result,
-        .data_map = instruction_layout.getInstructionDataMap(result),
+        .layout = instruction_layout.getInstructionDataMap(result),
     };
 }
 

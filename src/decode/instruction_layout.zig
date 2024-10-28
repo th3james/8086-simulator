@@ -9,13 +9,13 @@ pub const InstructionField = struct {
     end: u4,
 };
 
-pub const InstructionDataMap = struct {
+pub const InstructionLayout = struct {
     displacement: ?InstructionField = null,
     data: ?InstructionField = null,
 };
 
-pub fn getInstructionDataMap(decoded_opcode: opcodes.DecodedOpcode) InstructionDataMap {
-    var result = InstructionDataMap{};
+pub fn getInstructionLayout(decoded_opcode: opcodes.DecodedOpcode) InstructionLayout {
+    var result = InstructionLayout{};
     switch (decoded_opcode.id) {
         .movRegOrMemToFromReg,
         .addRegOrMemToEither,
@@ -116,7 +116,7 @@ test "getInstructionDataMap - MOV Memory mode, no displacement" {
         .regOrMem = 0b000,
         .length = 2,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(null, result.displacement);
 }
 
@@ -128,7 +128,7 @@ test "getInstructionDataMap - MOV Memory mode, direct address" {
         .regOrMem = 0b110,
         .length = 2,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(2, result.displacement.?.start);
     try std.testing.expectEqual(4, result.displacement.?.end);
 }
@@ -141,7 +141,7 @@ test "getInstructionDataMap - Reg-to-reg MOV Decode" {
         .regOrMem = 0b110,
         .length = 2,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(null, result.displacement);
 }
 
@@ -153,7 +153,7 @@ test "getInstructionDataMap - MOV Decode Memory mode 8-bit" {
         .regOrMem = 0b000,
         .length = 2,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(2, result.displacement.?.start);
     try std.testing.expectEqual(3, result.displacement.?.end);
 }
@@ -165,7 +165,7 @@ test "getInstructionDataMap - MOV Decode Memory mode 16-bit" {
         .mod = 0b10,
         .length = 2,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(2, result.displacement.?.start);
     try std.testing.expectEqual(4, result.displacement.?.end);
 }
@@ -177,7 +177,7 @@ test "getInstructionDataMap - MOV Immediate to register narrow" {
         .wide = false,
         .length = 1,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
     try std.testing.expectEqual(2, result.data.?.end);
 }
@@ -189,7 +189,7 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
         .wide = true,
         .length = 1,
     };
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
     try std.testing.expectEqual(1, result.data.?.start);
     try std.testing.expectEqual(3, result.data.?.end);
 }
@@ -203,7 +203,7 @@ test "getInstructionDataMap - MOV Immediate to register/memory, wide displacemen
         .length = 2,
     };
 
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
 
     try std.testing.expectEqual(2, result.displacement.?.start);
     try std.testing.expectEqual(4, result.displacement.?.end);
@@ -220,7 +220,7 @@ test "getInstructionDataMap - MOV Immediate to register/memory wide, no displace
         .length = 2,
     };
 
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
 
     try std.testing.expectEqual(null, result.displacement);
     try std.testing.expectEqual(2, result.data.?.start);
@@ -236,7 +236,7 @@ test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extensi
         .length = 2,
     };
 
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
 
     try std.testing.expectEqual(null, result.displacement);
     try std.testing.expectEqual(2, result.data.?.start);
@@ -250,18 +250,18 @@ test "getInstructionDataMap - JNZ has signed displacement" {
         .length = 1,
     };
 
-    const result = getInstructionDataMap(decoded_opcode);
+    const result = getInstructionLayout(decoded_opcode);
 
     try std.testing.expectEqual(null, result.data);
     try std.testing.expectEqual(1, result.displacement.?.start);
     try std.testing.expectEqual(2, result.displacement.?.end);
 }
 
-pub fn getInstructionLength(opcode_len: u4, data_map: InstructionDataMap) u4 {
+pub fn getInstructionLength(opcode_len: u4, data_map: InstructionLayout) u4 {
     assert(opcode_len > 0);
     var length = opcode_len;
 
-    inline for (std.meta.fields(InstructionDataMap)) |field| {
+    inline for (std.meta.fields(InstructionLayout)) |field| {
         if (@field(data_map, field.name)) |value| {
             if (@hasField(@TypeOf(value), "end")) {
                 length = @max(length, value.end);
@@ -275,12 +275,12 @@ pub fn getInstructionLength(opcode_len: u4, data_map: InstructionDataMap) u4 {
 }
 
 test "getInstructionLength - returns opcode length when there is no additional data" {
-    const in = InstructionDataMap{};
+    const in = InstructionLayout{};
     try std.testing.expectEqual(2, getInstructionLength(2, in));
 }
 
 test "getInstructionLength - returns the end of displacement when specified" {
-    const in = InstructionDataMap{ .displacement = .{
+    const in = InstructionLayout{ .displacement = .{
         .start = 2,
         .end = 3,
     } };
@@ -288,7 +288,7 @@ test "getInstructionLength - returns the end of displacement when specified" {
 }
 
 test "getInstructionLength - returns the end of data when specified" {
-    const in = InstructionDataMap{ .data = .{
+    const in = InstructionLayout{ .data = .{
         .start = 1,
         .end = 2,
     } };
@@ -296,7 +296,7 @@ test "getInstructionLength - returns the end of data when specified" {
 }
 
 test "getInstructionLength - returns the maximum end value when multiple fields are specified" {
-    const in = InstructionDataMap{
+    const in = InstructionLayout{
         .displacement = .{
             .start = 1,
             .end = 3,

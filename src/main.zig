@@ -148,13 +148,13 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
             return InvalidBinaryErrors.IncompleteInstruction;
         memory_address = instruction_end;
 
-        const the_raw_instruction = instruction.Instruction{
+        const current_instruction = instruction.Instruction{
             .bytes = instruction_bytes,
             .opcode = opcode,
             .layout = layout,
         };
 
-        const instruction_args = try decode_args.decodeArgs(arena_allocator, the_raw_instruction);
+        const instruction_args = try decode_args.decodeArgs(arena_allocator, current_instruction);
 
         const args_str = try std.mem.join(arena_allocator, ", ", instruction_args.args);
         try stdout.print("{s} {s}\n", .{ opcode.name, args_str });

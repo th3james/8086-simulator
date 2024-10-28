@@ -3,7 +3,7 @@ const assert = std.debug.assert;
 
 const memory = @import("memory.zig");
 const opcodes = @import("decode/opcodes.zig");
-const instruction_data = @import("decode/instruction_data.zig");
+const instruction_layout = @import("decode/instruction_layout.zig");
 const decode_errors = @import("decode/errors.zig");
 const instruction = @import("decode/instruction.zig");
 const decode_args = @import("decode/args.zig");
@@ -136,11 +136,11 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
 
         const opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
 
-        const data_map = instruction_data.getInstructionDataMap(opcode);
+        const data_map = instruction_layout.getInstructionDataMap(opcode);
 
-        const instruction_end = memory_address + instruction_data.getInstructionLength(opcode.length, data_map);
+        const instruction_end = memory_address + instruction_layout.getInstructionLength(opcode.length, data_map);
         assert(instruction_end > memory_address);
-        assert((instruction_end - memory_address) <= instruction_data.MAX_INSTRUCTION_LENGTH);
+        assert((instruction_end - memory_address) <= instruction_layout.MAX_INSTRUCTION_LENGTH);
 
         const instruction_bytes = if (instruction_end <= program_len)
             memory.sliceMemory(mem, memory_address, instruction_end)

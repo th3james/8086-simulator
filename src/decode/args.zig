@@ -2,7 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const opcodes = @import("opcodes.zig");
-const instruction_data = @import("instruction_data.zig");
+const instruction_layout = @import("instruction_layout.zig");
 const instruction = @import("instruction.zig");
 const register_names = @import("register_names.zig");
 const errors = @import("errors.zig");
@@ -241,7 +241,7 @@ fn buildRawInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Inst
     return instruction.Instruction{
         .base = bytes[0..],
         .opcode = result,
-        .data_map = instruction_data.getInstructionDataMap(result),
+        .data_map = instruction_layout.getInstructionDataMap(result),
     };
 }
 

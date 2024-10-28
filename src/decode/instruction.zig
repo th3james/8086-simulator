@@ -1,14 +1,14 @@
 const std = @import("std");
 const opcodes = @import("opcodes.zig");
-const instruction_data = @import("instruction_data.zig");
+const instruction_layout = @import("instruction_layout.zig");
 const errors = @import("errors.zig");
 
 pub const Instruction = struct {
     base: []const u8,
     opcode: opcodes.DecodedOpcode,
-    data_map: instruction_data.InstructionDataMap,
+    data_map: instruction_layout.InstructionDataMap, // TODO rename 'layout'?
 
-    fn extractValue(self: *const Instruction, field: instruction_data.InstructionField) errors.InstructionErrors!i16 {
+    fn extractValue(self: *const Instruction, field: instruction_layout.InstructionField) errors.InstructionErrors!i16 {
         if (field.end - field.start == 1) {
             return @as(i16, @as(i8, @bitCast(self.base[field.start])));
         } else if (field.end - field.start == 2) {

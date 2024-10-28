@@ -149,7 +149,7 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
         memory_address = instruction_end;
 
         const the_raw_instruction = instruction.Instruction{
-            .base = instruction_bytes,
+            .bytes = instruction_bytes,
             .opcode = opcode,
             .layout = layout,
         };

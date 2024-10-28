@@ -4,15 +4,15 @@ const instruction_layout = @import("instruction_layout.zig");
 const errors = @import("errors.zig");
 
 pub const Instruction = struct {
-    base: []const u8,
+    bytes: []const u8,
     opcode: opcodes.DecodedOpcode,
     layout: instruction_layout.InstructionLayout,
 
     fn extractValue(self: *const Instruction, field: instruction_layout.InstructionField) errors.InstructionErrors!i16 {
         if (field.end - field.start == 1) {
-            return @as(i16, @as(i8, @bitCast(self.base[field.start])));
+            return @as(i16, @as(i8, @bitCast(self.bytes[field.start])));
         } else if (field.end - field.start == 2) {
-            return @as(i16, @bitCast(@as(u16, self.base[field.end - 1]) << 8 | @as(u16, self.base[field.start])));
+            return @as(i16, @bitCast(@as(u16, self.bytes[field.end - 1]) << 8 | @as(u16, self.bytes[field.start])));
         } else {
             return errors.InstructionErrors.UnhandledRange;
         }
@@ -30,9 +30,9 @@ pub const Instruction = struct {
 };
 
 test "Instruction.getDisplacement - errors when no data map" {
-    var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
+    var bytes = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
     const in = Instruction{
-        .base = &base,
+        .bytes = &bytes,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
         .layout = .{},
     };
@@ -40,9 +40,9 @@ test "Instruction.getDisplacement - errors when no data map" {
 }
 
 test "Instruction.getDisplacement - positive narrow" {
-    var base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 };
+    var bytes = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 };
     const in = Instruction{
-        .base = &base,
+        .bytes = &bytes,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 1 },
         .layout = .{
             .displacement = .{
@@ -55,9 +55,9 @@ test "Instruction.getDisplacement - positive narrow" {
 }
 
 test "Instruction.getDisplacement - negative narrow is sign-extended" {
-    var base = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 };
+    var bytes = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 };
     const in = Instruction{
-        .base = &base,
+        .bytes = &bytes,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .layout = .{
             .displacement = .{
@@ -70,9 +70,9 @@ test "Instruction.getDisplacement - negative narrow is sign-extended" {
 }
 
 test "Instruction.getDisplacement - wide" {
-    var base = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 };
+    var bytes = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 };
     const in = Instruction{
-        .base = &base,
+        .bytes = &bytes,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .layout = .{
             .displacement = .{
@@ -85,9 +85,9 @@ test "Instruction.getDisplacement - wide" {
 }
 
 test "Instruction.getImmediate - errors when no data map" {
-    var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
+    var bytes = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
     const in = Instruction{
-        .base = &base,
+        .bytes = &bytes,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .layout = .{},
     };
@@ -95,9 +95,9 @@ test "Instruction.getImmediate - errors when no data map" {
 }
 
 test "Instruction.getImmediate - narrow" {
-    var base = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 };
+    var bytes = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 };
     const in = Instruction{
-        .base = &base,
+        .bytes = &bytes,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .layout = .{
             .immediate = .{

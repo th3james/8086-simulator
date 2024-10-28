@@ -142,7 +142,7 @@ pub fn decodeArgs(allocator: std.mem.Allocator, raw: instruction.Instruction) !I
                 const data_str = try std.fmt.allocPrint(allocator, "{d}", .{data});
                 try args.append(data_str);
             } else {
-                const data: i8 = @bitCast(raw.base[1]);
+                const data: i8 = @bitCast(raw.bytes[1]);
                 const data_str = try std.fmt.allocPrint(allocator, "{d}", .{data});
                 try args.append(data_str);
             }
@@ -239,7 +239,7 @@ fn appendEffectiveAddress(
 fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruction {
     const result = try opcodes.decodeOpcode(bytes[0..length]);
     return instruction.Instruction{
-        .base = bytes[0..],
+        .bytes = bytes[0..],
         .opcode = result,
         .layout = instruction_layout.getInstructionLayout(result),
     };

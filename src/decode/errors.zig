@@ -1,1 +1,1 @@
-pub const InstructionErrors = error{ UnhandledRange, NoDisplacement, NoData };
+pub const InstructionErrors = error{ UnhandledRange, NoDisplacement, NoImmediate };

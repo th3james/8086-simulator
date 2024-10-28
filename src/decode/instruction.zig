@@ -19,17 +19,17 @@ pub const Instruction = struct {
     }
 
     pub fn getDisplacement(self: *const Instruction) errors.InstructionErrors!i16 {
-        const displacement_map = self.layout.displacement orelse return errors.InstructionErrors.NoDisplacement;
-        return self.extractValue(displacement_map);
+        const displacement_location = self.layout.displacement orelse return errors.InstructionErrors.NoDisplacement;
+        return self.extractValue(displacement_location);
     }
 
-    pub fn getData(self: *const Instruction) errors.InstructionErrors!i16 {
-        const data_map = self.layout.data orelse return errors.InstructionErrors.NoData;
-        return self.extractValue(data_map);
+    pub fn getImmediate(self: *const Instruction) errors.InstructionErrors!i16 {
+        const immediate_location = self.layout.immediate orelse return errors.InstructionErrors.NoImmediate;
+        return self.extractValue(immediate_location);
     }
 };
 
-test "RawInstruction.getDisplacement - errors when no data map" {
+test "Instruction.getDisplacement - errors when no data map" {
     var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
     const in = Instruction{
         .base = &base,
@@ -39,7 +39,7 @@ test "RawInstruction.getDisplacement - errors when no data map" {
     try std.testing.expectError(errors.InstructionErrors.NoDisplacement, in.getDisplacement());
 }
 
-test "RawInstruction.getDisplacement - positive narrow" {
+test "Instruction.getDisplacement - positive narrow" {
     var base = [_]u8{ 0b10111001, 1, 0, 0, 0, 0 };
     const in = Instruction{
         .base = &base,
@@ -54,7 +54,7 @@ test "RawInstruction.getDisplacement - positive narrow" {
     try std.testing.expectEqual(1, try in.getDisplacement());
 }
 
-test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
+test "Instruction.getDisplacement - negative narrow is sign-extended" {
     var base = [_]u8{ 0b10111001, 0b1101_1011, 0, 0, 0, 0 };
     const in = Instruction{
         .base = &base,
@@ -69,7 +69,7 @@ test "RawInstruction.getDisplacement - negative narrow is sign-extended" {
     try std.testing.expectEqual(-37, try in.getDisplacement());
 }
 
-test "RawInstruction.getDisplacement - wide" {
+test "Instruction.getDisplacement - wide" {
     var base = [_]u8{ 0b10111001, 0, 0b1, 0, 0, 0 };
     const in = Instruction{
         .base = &base,
@@ -84,27 +84,27 @@ test "RawInstruction.getDisplacement - wide" {
     try std.testing.expectEqual(256, try in.getDisplacement());
 }
 
-test "RawInstruction.getData - errors when no data map" {
+test "Instruction.getImmediate - errors when no data map" {
     var base = [_]u8{ 0b10111001, 0b10, 0b1, 0, 0, 0 };
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .layout = .{},
     };
-    try std.testing.expectError(errors.InstructionErrors.NoData, in.getData());
+    try std.testing.expectError(errors.InstructionErrors.NoImmediate, in.getImmediate());
 }
 
-test "RawInstruction.getData - narrow" {
+test "Instruction.getImmediate - narrow" {
     var base = [_]u8{ 0b10111001, 0b10, 0, 0, 0, 0 };
     const in = Instruction{
         .base = &base,
         .opcode = .{ .id = .movImmediateToReg, .name = "nvm", .length = 2 },
         .layout = .{
-            .data = .{
+            .immediate = .{
                 .start = 1,
                 .end = 2,
             },
         },
     };
-    try std.testing.expectEqual(2, try in.getData());
+    try std.testing.expectEqual(2, try in.getImmediate());
 }

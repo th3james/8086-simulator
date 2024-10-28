@@ -11,7 +11,7 @@ pub const InstructionField = struct {
 
 pub const InstructionLayout = struct {
     displacement: ?InstructionField = null,
-    data: ?InstructionField = null,
+    immediate: ?InstructionField = null,
 };
 
 pub fn getInstructionLayout(decoded_opcode: opcodes.DecodedOpcode) InstructionLayout {
@@ -41,7 +41,7 @@ pub fn getInstructionLayout(decoded_opcode: opcodes.DecodedOpcode) InstructionLa
         .subImmediateToAccumulator,
         .cmpImmediateWithAccumulator,
         => {
-            result.data = .{
+            result.immediate = .{
                 .start = 1,
                 .end = if (decoded_opcode.wide.?)
                     3
@@ -71,7 +71,7 @@ pub fn getInstructionLayout(decoded_opcode: opcodes.DecodedOpcode) InstructionLa
             else
                 2;
 
-            result.data = .{
+            result.immediate = .{
                 .start = next,
                 .end = if (decoded_opcode.wide.? and !decoded_opcode.sign)
                     next + 2
@@ -178,8 +178,8 @@ test "getInstructionDataMap - MOV Immediate to register narrow" {
         .length = 1,
     };
     const result = getInstructionLayout(decoded_opcode);
-    try std.testing.expectEqual(1, result.data.?.start);
-    try std.testing.expectEqual(2, result.data.?.end);
+    try std.testing.expectEqual(1, result.immediate.?.start);
+    try std.testing.expectEqual(2, result.immediate.?.end);
 }
 
 test "getInstructionDataMap - MOV Immediate to register wide" {
@@ -190,8 +190,8 @@ test "getInstructionDataMap - MOV Immediate to register wide" {
         .length = 1,
     };
     const result = getInstructionLayout(decoded_opcode);
-    try std.testing.expectEqual(1, result.data.?.start);
-    try std.testing.expectEqual(3, result.data.?.end);
+    try std.testing.expectEqual(1, result.immediate.?.start);
+    try std.testing.expectEqual(3, result.immediate.?.end);
 }
 
 test "getInstructionDataMap - MOV Immediate to register/memory, wide displacement, narrow data" {
@@ -207,8 +207,8 @@ test "getInstructionDataMap - MOV Immediate to register/memory, wide displacemen
 
     try std.testing.expectEqual(2, result.displacement.?.start);
     try std.testing.expectEqual(4, result.displacement.?.end);
-    try std.testing.expectEqual(4, result.data.?.start);
-    try std.testing.expectEqual(5, result.data.?.end);
+    try std.testing.expectEqual(4, result.immediate.?.start);
+    try std.testing.expectEqual(5, result.immediate.?.end);
 }
 
 test "getInstructionDataMap - MOV Immediate to register/memory wide, no displacement, wide data" {
@@ -223,8 +223,8 @@ test "getInstructionDataMap - MOV Immediate to register/memory wide, no displace
     const result = getInstructionLayout(decoded_opcode);
 
     try std.testing.expectEqual(null, result.displacement);
-    try std.testing.expectEqual(2, result.data.?.start);
-    try std.testing.expectEqual(4, result.data.?.end);
+    try std.testing.expectEqual(2, result.immediate.?.start);
+    try std.testing.expectEqual(4, result.immediate.?.end);
 }
 
 test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extension" {
@@ -239,8 +239,8 @@ test "getInstructionDataMap - ADD immediate to reg or mem with wide sign extensi
     const result = getInstructionLayout(decoded_opcode);
 
     try std.testing.expectEqual(null, result.displacement);
-    try std.testing.expectEqual(2, result.data.?.start);
-    try std.testing.expectEqual(3, result.data.?.end);
+    try std.testing.expectEqual(2, result.immediate.?.start);
+    try std.testing.expectEqual(3, result.immediate.?.end);
 }
 
 test "getInstructionDataMap - JNZ has signed displacement" {
@@ -252,7 +252,7 @@ test "getInstructionDataMap - JNZ has signed displacement" {
 
     const result = getInstructionLayout(decoded_opcode);
 
-    try std.testing.expectEqual(null, result.data);
+    try std.testing.expectEqual(null, result.immediate);
     try std.testing.expectEqual(1, result.displacement.?.start);
     try std.testing.expectEqual(2, result.displacement.?.end);
 }
@@ -288,7 +288,7 @@ test "getInstructionLength - returns the end of displacement when specified" {
 }
 
 test "getInstructionLength - returns the end of data when specified" {
-    const in = InstructionLayout{ .data = .{
+    const in = InstructionLayout{ .immediate = .{
         .start = 1,
         .end = 2,
     } };
@@ -301,7 +301,7 @@ test "getInstructionLength - returns the maximum end value when multiple fields 
             .start = 1,
             .end = 3,
         },
-        .data = .{
+        .immediate = .{
             .start = 1,
             .end = 2,
         },

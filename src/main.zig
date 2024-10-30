@@ -6,7 +6,7 @@ const opcodes = @import("decode/opcodes.zig");
 const instruction_layout = @import("decode/instruction_layout.zig");
 const decode_errors = @import("decode/errors.zig");
 const instruction = @import("decode/instruction.zig");
-const decode_args = @import("decode/args.zig");
+const decode_arguments = @import("decode/arguments.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
 
@@ -154,10 +154,14 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
             .layout = layout,
         };
 
-        const instruction_args = try decode_args.decodeArgs(arena_allocator, current_instruction);
+        const instruction_args = try decode_arguments.decodeArguments(current_instruction);
 
-        const args_str = try std.mem.join(arena_allocator, ", ", instruction_args.args);
-        try stdout.print("{s} {s}\n", .{ opcode.name, args_str });
+        const instruction_str = try decode_arguments.argumentsToString(
+            arena_allocator,
+            opcode.name,
+            instruction_args,
+        );
+        try stdout.print("{s}\n", .{instruction_str});
     }
 
     try bw.flush();

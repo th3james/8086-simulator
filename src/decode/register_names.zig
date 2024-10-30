@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Register = enum { al, cl, dl, bl, ah, ch, dh, bh, ax, cx, dx, bx, sp, bp, si, di, none };
+pub const Register = enum { al, cl, dl, bl, ah, ch, dh, bh, ax, cx, dx, bx, sp, bp, si, di, none };
 
 const RegisterInfo = struct {
     narrow: Register,

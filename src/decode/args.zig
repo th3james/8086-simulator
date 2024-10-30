@@ -248,7 +248,6 @@ fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruc
 test "decodeArgs - MOV Decode - Reg to Reg" {
     const allocator = std.testing.allocator;
     const bytes = [_]u8{ 0b10001000, 0b11000001, 0, 0, 0, 0 };
-    // TODO this the_... naming is horrid
     const subject = try buildInstructionFromBytes(
         &bytes,
         2,

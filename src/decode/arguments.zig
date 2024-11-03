@@ -8,6 +8,7 @@ const registers = @import("register_names.zig");
 pub const Operand = union(enum) {
     register: registers.Register,
     relative_address: i16,
+    immediate: i16, // TODO might need an unsigned variant?
     effective_address: registers.EffectiveAddress,
     none,
 };
@@ -62,6 +63,14 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                 },
             }
         },
+        opcodes.OpcodeId.movImmediateToReg => {
+            const reg = registers.getRegister(inst.opcode.reg.?, inst.opcode.wide.?);
+            const immediate = try inst.getImmediate();
+            return .{
+                Operand{ .register = reg },
+                Operand{ .immediate = immediate },
+            };
+        },
         else => {
             return .{
                 Operand.none,
@@ -105,7 +114,7 @@ test "decodeArguments - MOV Direct address" {
     try std.testing.expectEqual(Operand{ .relative_address = 257 }, result[1]);
 }
 
-test "decodeArguments = MOV reg or memory" {
+test "decodeArguments - MOV reg or memory" {
     const subject = try buildInstructionFromBytes(
         &[_]u8{ 0b1000_1011, 0b0100_0001, 0b1101_1011, 0b0, 0, 0 },
         2,
@@ -120,4 +129,17 @@ test "decodeArguments = MOV reg or memory" {
         .displacement = -37,
     };
     try std.testing.expectEqual(expected_address, result[1].effective_address);
+}
+
+test "decodeArguments - MOV Decode - Immediate to register narrow positive" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b10110001, 0b00000110, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+
+    // TODO next assertion could be wrong
+    try std.testing.expectEqual(Operand{ .register = registers.Register.cl }, result[0]);
+    try std.testing.expectEqual(Operand{ .immediate = 6 }, result[1]);
 }

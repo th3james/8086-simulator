@@ -8,6 +8,7 @@ const registers = @import("register_names.zig");
 pub const Operand = union(enum) {
     register: registers.Register,
     relative_address: i16,
+    effective_address: registers.EffectiveAddress,
     none,
 };
 
@@ -42,10 +43,22 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                     };
                 },
                 else => {
-                    return .{
-                        Operand.none,
-                        Operand.none,
-                    };
+                    const reg = registers.getRegister(inst.opcode.reg.?, inst.opcode.wide.?);
+                    const effective_address = registers.effectiveAddressRegisters(
+                        inst.opcode.regOrMem.?,
+                        try inst.getDisplacement(),
+                    );
+                    if (inst.opcode.regIsDestination orelse false) {
+                        return .{
+                            Operand{ .register = reg },
+                            Operand{ .effective_address = effective_address },
+                        };
+                    } else {
+                        return .{
+                            Operand{ .effective_address = effective_address },
+                            Operand{ .register = reg },
+                        };
+                    }
                 },
             }
         },
@@ -90,4 +103,21 @@ test "decodeArguments - MOV Direct address" {
 
     try std.testing.expectEqual(registers.Register.al, result[0].register);
     try std.testing.expectEqual(Operand{ .relative_address = 257 }, result[1]);
+}
+
+test "decodeArguments = MOV reg or memory" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b1000_1011, 0b0100_0001, 0b1101_1011, 0b0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(registers.Register.ax, result[0].register);
+    const expected_address = registers.EffectiveAddress{
+        .r1 = registers.Register.bx,
+        .r2 = registers.Register.di,
+        .displacement = -37,
+    };
+    try std.testing.expectEqual(expected_address, result[1].effective_address);
 }

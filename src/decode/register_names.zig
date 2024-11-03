@@ -55,7 +55,7 @@ const effectiveAddressRegisterMap = [_][2]Register{
     .{ Register.bx, Register.none },
 };
 
-const EffectiveAddress = struct { r1: Register, r2: Register, displacement: i16 };
+pub const EffectiveAddress = struct { r1: Register, r2: Register, displacement: i16 };
 // Table 4-10. R/M (Register/Memory) Field Encoding
 pub fn effectiveAddressRegisters(regOrMem: u3, displacement: i16) EffectiveAddress {
     const names = effectiveAddressRegisterMap[regOrMem];

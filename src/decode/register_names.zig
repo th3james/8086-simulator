@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 
 pub const Register = enum { al, cl, dl, bl, ah, ch, dh, bh, ax, cx, dx, bx, sp, bp, si, di, none };
 
@@ -17,6 +18,18 @@ const registerMap = [_]RegisterInfo{
     RegisterInfo{ .narrow = Register.bh, .wide = Register.di },
 };
 
+pub fn getRegister(reg: u3, wide: bool) Register {
+    assert(reg < registerMap.len);
+    const registers = registerMap[reg];
+    return if (wide) registers.wide else registers.narrow;
+}
+
+test "getRegister gets register" {
+    try std.testing.expectEqual(Register.al, getRegister(0b000, false));
+    try std.testing.expectEqual(Register.cx, getRegister(0b001, true));
+}
+
+// TODO delete
 pub fn registerName(reg: u3, wide: bool) []const u8 {
     if (reg >= registerMap.len) {
         return "xx"; // Unknown or invalid register code

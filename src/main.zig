@@ -7,6 +7,7 @@ const instruction_layout = @import("decode/instruction_layout.zig");
 const decode_errors = @import("decode/errors.zig");
 const instruction = @import("decode/instruction.zig");
 const decode_arguments = @import("decode/arguments.zig");
+const decode_print = @import("decode/print.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
 
@@ -156,7 +157,7 @@ fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: 
 
         const instruction_args = try decode_arguments.decodeArguments(current_instruction);
 
-        const instruction_str = try decode_arguments.argumentsToString(
+        const instruction_str = try decode_print.instructionToString(
             arena_allocator,
             opcode.name,
             instruction_args,

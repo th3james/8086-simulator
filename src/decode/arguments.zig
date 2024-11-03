@@ -5,23 +5,57 @@ const instruction_layout = @import("instruction_layout.zig");
 const opcodes = @import("opcodes.zig");
 const registers = @import("register_names.zig");
 
-const Operand = union(enum) {
+pub const Operand = union(enum) {
     register: registers.Register,
-    memory_address: u32,
+    relative_address: i16,
     none,
 };
 
 pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
-    return switch (inst.opcode.id) {
-        opcodes.OpcodeId.movRegOrMemToFromReg => .{
-            Operand{ .register = registers.Register.cl },
-            Operand{ .register = registers.Register.al },
+    switch (inst.opcode.id) {
+        opcodes.OpcodeId.movRegOrMemToFromReg => {
+            switch (inst.opcode.mod.?) {
+                0b00 => { // Memory mode, no displacement
+                    if (inst.opcode.regOrMem == 0b110) { // Direct address
+                        const reg = registers.getRegister(
+                            inst.opcode.reg.?,
+                            inst.opcode.wide.?,
+                        );
+
+                        return .{
+                            Operand{ .register = reg },
+                            Operand{ .relative_address = try inst.getDisplacement() },
+                        };
+                    } else {
+                        return .{
+                            Operand.none,
+                            Operand.none,
+                        };
+                    }
+                },
+                0b11 => { // Register to Register
+                    const dest = if (inst.opcode.regIsDestination.?) inst.opcode.reg.? else inst.opcode.regOrMem.?;
+                    const source = if (inst.opcode.regIsDestination.?) inst.opcode.regOrMem.? else inst.opcode.reg.?;
+                    return .{
+                        Operand{ .register = registers.getRegister(dest, inst.opcode.wide.?) },
+                        Operand{ .register = registers.getRegister(source, inst.opcode.wide.?) },
+                    };
+                },
+                else => {
+                    return .{
+                        Operand.none,
+                        Operand.none,
+                    };
+                },
+            }
         },
-        else => .{
-            Operand.none,
-            Operand.none,
+        else => {
+            return .{
+                Operand.none,
+                Operand.none,
+            };
         },
-    };
+    }
 }
 
 fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruction {
@@ -33,7 +67,7 @@ fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruc
     };
 }
 
-test "decodeArguments - MOV Decode - Reg to Reg" {
+test "decodeArguments - MOV Reg to Reg" {
     const bytes = [_]u8{ 0b10001000, 0b11000001, 0, 0, 0, 0 };
     const subject = try buildInstructionFromBytes(
         &bytes,
@@ -46,7 +80,7 @@ test "decodeArguments - MOV Decode - Reg to Reg" {
     try std.testing.expectEqual(registers.Register.al, result[1].register);
 }
 
-test "decodeArgs - MOV Direct address" {
+test "decodeArguments - MOV Direct address" {
     const subject = try buildInstructionFromBytes(
         &[_]u8{ 0b10001000, 0b00000110, 0b1, 0b1, 0, 0 },
         2,
@@ -55,36 +89,5 @@ test "decodeArgs - MOV Direct address" {
     const result = try decodeArguments(subject);
 
     try std.testing.expectEqual(registers.Register.al, result[0].register);
-    try std.testing.expectEqual(Operand{ .memory_address = 257 }, result[1]);
-}
-
-fn operandToString(allocator: std.mem.Allocator, argument: Operand) ![]const u8 {
-    return switch (argument) {
-        .register => |*r| @tagName(r.*),
-        else => try std.fmt.allocPrint(allocator, "5", .{}),
-    };
-}
-
-pub fn argumentsToString(
-    allocator: std.mem.Allocator,
-    mnemonic: []const u8,
-    args: [2]Operand,
-) ![]const u8 {
-    const arg1_str = try operandToString(allocator, args[0]);
-    const arg2_str = try operandToString(allocator, args[1]);
-    return try std.fmt.allocPrint(allocator, "{s} {s}, {s}", .{ mnemonic, arg1_str, arg2_str });
-}
-
-test "argumentsToString - MOV Decode - Reg to Reg" {
-    const args = [_]Operand{
-        .{ .register = registers.Register.cl },
-        .{ .register = registers.Register.al },
-    };
-    const result = try argumentsToString(
-        std.testing.allocator,
-        "mov",
-        args,
-    );
-
-    try std.testing.expectEqualStrings("mov cl, al", result);
+    try std.testing.expectEqual(Operand{ .relative_address = 257 }, result[1]);
 }

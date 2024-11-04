@@ -84,6 +84,7 @@ test "effective address options 8-bit displacement" {
     try std.testing.expectEqual(1, result.displacement);
 }
 
+// TODO delete from here to end of file
 fn writeEffectiveAddress(
     writer: anytype,
     effectiveAddress: EffectiveAddress,

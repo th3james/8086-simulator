@@ -19,10 +19,104 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
             );
             try writer.writeAll("]");
         },
+        .effective_address => |*addr| {
+            try writer.writeAll("[");
+            try writer.writeAll(@tagName(addr.r1));
+
+            if (addr.r2 != registers.Register.none) {
+                try writer.writeAll(" + ");
+                try writer.writeAll(@tagName(addr.r2));
+            }
+
+            if (addr.displacement != 0) {
+                if (addr.displacement > 0) {
+                    try writer.writeAll(" + ");
+                } else {
+                    try writer.writeAll(" - ");
+                }
+
+                try std.fmt.formatInt(
+                    @abs(addr.displacement),
+                    10,
+                    .lower,
+                    .{},
+                    writer,
+                );
+            }
+            try writer.writeAll("]");
+        },
         else => {
             try writer.writeAll("welp");
         },
     }
+}
+
+test "operandToString - EffectiveAddress with one register" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+    const address = registers.EffectiveAddress{
+        .r1 = registers.Register.si,
+        .r2 = registers.Register.none,
+        .displacement = 0,
+    };
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .effective_address = address },
+    );
+
+    try std.testing.expectEqualStrings("[si]", result_buffer.items);
+}
+
+test "operandToString - EffectiveAddress no displacements" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+    const address = registers.EffectiveAddress{
+        .r1 = registers.Register.bx,
+        .r2 = registers.Register.si,
+        .displacement = 0,
+    };
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .effective_address = address },
+    );
+
+    try std.testing.expectEqualStrings("[bx + si]", result_buffer.items);
+}
+
+test "operandToString - EffectiveAddress with positive displacement" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+    const address = registers.EffectiveAddress{
+        .r1 = registers.Register.bx,
+        .r2 = registers.Register.di,
+        .displacement = 250,
+    };
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .effective_address = address },
+    );
+
+    try std.testing.expectEqualStrings("[bx + di + 250]", result_buffer.items);
+}
+
+test "operandToString - EffectiveAddress with negative displacement" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+    const address = registers.EffectiveAddress{
+        .r1 = registers.Register.bx,
+        .r2 = registers.Register.di,
+        .displacement = -37,
+    };
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .effective_address = address },
+    );
+
+    try std.testing.expectEqualStrings("[bx + di - 37]", result_buffer.items);
 }
 
 // cp ax, bx

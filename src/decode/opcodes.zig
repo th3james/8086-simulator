@@ -354,6 +354,17 @@ pub const OpcodeTable = [_]OpcodeDefinition{
     },
 };
 
+pub const Mode = enum(u2) {
+    memory_no_displacement = 0b00,
+    memory_8_bit_displacement = 0b01,
+    memory_16_bit_displacement = 0b10,
+    register = 0b11,
+
+    pub fn fromInt(value: u2) Mode {
+        return @enumFromInt(value);
+    }
+};
+
 // TODO this is inconsistent with errors.zig
 pub const Errors = error{ InsufficientBytes, UnrecognisedOpcode };
 
@@ -439,7 +450,7 @@ test "decodeOpcode - MOV Decode Memory mode 8-bit" {
     const result = try decodeOpcode(&[_]u8{ 0b10001000, 0b01000000 });
     try std.testing.expectEqual(OpcodeId.movRegOrMemToFromReg, result.id);
     try std.testing.expectEqualStrings("mov", result.name);
-    try std.testing.expectEqual(0b01, result.mod.?);
+    try std.testing.expectEqual(Mode.memory_8_bit_displacement, Mode.fromInt(result.mod.?));
 }
 
 test "decodeOpcode - MOV Decode Memory mode 16-bit" {

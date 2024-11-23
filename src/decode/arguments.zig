@@ -94,8 +94,16 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             const immediate = try inst.getImmediate();
             const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
             return .{
-                Operand{ .effective_address = effective_address },
-                Operand{ .immediate = .{ .value = immediate, .size = size } },
+                .{ .effective_address = effective_address },
+                .{ .immediate = .{ .value = immediate, .size = size } },
+            };
+        },
+
+        opcodes.OpcodeId.memoryToAccumulator => {
+            const immediate = try inst.getImmediate();
+            return .{
+                .{ .register = .ax },
+                .{ .effective_address = .{ .r1 = .none, .r2 = .none, .displacement = immediate } },
             };
         },
 
@@ -202,7 +210,6 @@ test "decodeArguments - MOV Decode - Immediate to effective address, narrow" {
         &[_]u8{ 0b11000110, 0b11, 7, 0, 0, 0 },
         2,
     );
-    std.debug.print("{}", .{subject.opcode.id});
 
     const result = try decodeArguments(subject);
 
@@ -220,9 +227,24 @@ test "decodeArguments - MOV Decode - Immediate to effective address, wide" {
         &[_]u8{ 0b11000111, 0b11, 8, 0, 0, 0 },
         2,
     );
-    std.debug.print("{}", .{subject.opcode.id});
 
     const result = try decodeArguments(subject);
 
     try std.testing.expectEqual(Operand{ .immediate = .{ .value = 8, .size = .word } }, result[1]);
+}
+
+test "decodeArguments - MOV Decode - memory to accumulator narrow" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b1010_0000, 120, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(Operand{ .register = .ax }, result[0]);
+    try std.testing.expectEqual(Operand{ .effective_address = .{
+        .r1 = .none,
+        .r2 = .none,
+        .displacement = 120,
+    } }, result[1]);
 }

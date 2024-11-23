@@ -245,21 +245,6 @@ fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruc
     };
 }
 
-test "decodeInstruction - MOV Decode - Immediate to register or memory - byte" {
-    const allocator = std.testing.allocator;
-    const subject = try buildInstructionFromBytes(
-        &[_]u8{ 0b11000110, 0b11, 7, 0, 0, 0 },
-        2,
-    );
-
-    const result = try decodeArgs(allocator, subject);
-    defer result.deinit(allocator);
-
-    try std.testing.expectEqual(@as(usize, 2), result.args.len);
-    try std.testing.expectEqualStrings("[bp + di]", result.args[0]);
-    try std.testing.expectEqualStrings("byte 7", result.args[1]);
-}
-
 test "decodeInstruction - MOV Decode - memory to accumulator narrow" {
     const allocator = std.testing.allocator;
     const subject = try buildInstructionFromBytes(

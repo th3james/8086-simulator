@@ -92,9 +92,10 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                 },
             );
             const immediate = try inst.getImmediate();
+            const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
             return .{
                 Operand{ .effective_address = effective_address },
-                Operand{ .immediate = .{ .value = immediate, .size = .byte } },
+                Operand{ .immediate = .{ .value = immediate, .size = size } },
             };
         },
 
@@ -212,4 +213,16 @@ test "decodeArguments - MOV Decode - Immediate to effective address, narrow" {
     };
     try std.testing.expectEqual(Operand{ .effective_address = expected_address }, result[0]);
     try std.testing.expectEqual(Operand{ .immediate = .{ .value = 7, .size = .byte } }, result[1]);
+}
+
+test "decodeArguments - MOV Decode - Immediate to effective address, wide" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b11000111, 0b11, 8, 0, 0, 0 },
+        2,
+    );
+    std.debug.print("{}", .{subject.opcode.id});
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = 8, .size = .word } }, result[1]);
 }

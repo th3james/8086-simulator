@@ -45,6 +45,13 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
             }
             try writer.writeAll("]");
         },
+        .immediate => |imm| {
+            if (imm.size == .registerDefined) {
+                try writer.print("{d}", .{imm.value});
+            } else {
+                try writer.print("{s} {d}", .{ @tagName(imm.size), imm.value });
+            }
+        },
         else => {
             try writer.writeAll("welp");
         },
@@ -117,6 +124,42 @@ test "operandToString - EffectiveAddress with negative displacement" {
     );
 
     try std.testing.expectEqualStrings("[bx + di - 37]", result_buffer.items);
+}
+
+test "operandToString - register defined immediate" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .immediate = .{ .value = 7, .size = .registerDefined } },
+    );
+
+    try std.testing.expectEqualStrings("7", result_buffer.items);
+}
+
+test "operandToString - byte immediate" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .immediate = .{ .value = 7, .size = .byte } },
+    );
+
+    try std.testing.expectEqualStrings("byte 7", result_buffer.items);
+}
+
+test "operandToString - word immediate" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .immediate = .{ .value = 7, .size = .word } },
+    );
+
+    try std.testing.expectEqualStrings("word 7", result_buffer.items);
 }
 
 // cp ax, bx

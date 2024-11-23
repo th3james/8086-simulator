@@ -6,10 +6,17 @@ const opcodes = @import("opcodes.zig");
 const registers = @import("register_names.zig");
 const errors = @import("errors.zig");
 
+const ImmediateSize = enum { registerDefined, byte, word };
+
+const Immediate = struct {
+    value: i16,
+    size: ImmediateSize,
+};
+
 pub const Operand = union(enum) {
     register: registers.Register,
     relative_address: i16,
-    immediate: i16, // TODO might need an unsigned variant?
+    immediate: Immediate, // TODO might need an unsigned variant?
     effective_address: registers.EffectiveAddress,
     none,
 };
@@ -70,7 +77,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             const immediate = try inst.getImmediate();
             return .{
                 Operand{ .register = reg },
-                Operand{ .immediate = immediate },
+                Operand{ .immediate = .{ .value = immediate, .size = .registerDefined } },
             };
         },
 
@@ -87,7 +94,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             const immediate = try inst.getImmediate();
             return .{
                 Operand{ .effective_address = effective_address },
-                Operand{ .immediate = immediate },
+                Operand{ .immediate = .{ .value = immediate, .size = .byte } },
             };
         },
 
@@ -161,7 +168,7 @@ test "decodeArguments - MOV Decode - Immediate to register narrow positive" {
 
     // TODO next assertion could be wrong
     try std.testing.expectEqual(Operand{ .register = registers.Register.cl }, result[0]);
-    try std.testing.expectEqual(Operand{ .immediate = 6 }, result[1]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = 6, .size = .registerDefined } }, result[1]);
 }
 
 test "decodeArguments - MOV Decode - Immediate to register narrow negative" {
@@ -174,7 +181,7 @@ test "decodeArguments - MOV Decode - Immediate to register narrow negative" {
 
     // TODO next assertion could be wrong
     try std.testing.expectEqual(Operand{ .register = registers.Register.cl }, result[0]);
-    try std.testing.expectEqual(Operand{ .immediate = -6 }, result[1]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = -6, .size = .registerDefined } }, result[1]);
 }
 
 test "decodeArguments - MOV Decode - Immediate to register wide" {
@@ -186,7 +193,7 @@ test "decodeArguments - MOV Decode - Immediate to register wide" {
     const result = try decodeArguments(subject);
 
     try std.testing.expectEqual(Operand{ .register = registers.Register.cx }, result[0]);
-    try std.testing.expectEqual(Operand{ .immediate = -3 }, result[1]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = -3, .size = .registerDefined } }, result[1]);
 }
 
 test "decodeArguments - MOV Decode - Immediate to effective address, narrow" {
@@ -204,5 +211,5 @@ test "decodeArguments - MOV Decode - Immediate to effective address, narrow" {
         .displacement = 0,
     };
     try std.testing.expectEqual(Operand{ .effective_address = expected_address }, result[0]);
-    try std.testing.expectEqual(Operand{ .immediate = 7 }, result[1]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = 7, .size = .byte } }, result[1]);
 }

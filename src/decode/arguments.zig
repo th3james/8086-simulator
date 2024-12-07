@@ -81,22 +81,33 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             };
         },
 
-        opcodes.OpcodeId.movImmediateToRegOrMem => {
-            const effective_address = registers.effectiveAddressRegisters(
-                inst.opcode.regOrMem.?,
-                inst.getDisplacement() catch |err| switch (err) {
-                    errors.InstructionErrors.NoDisplacement => 0,
-                    else => {
-                        return err;
-                    },
+        opcodes.OpcodeId.movImmediateToRegOrMem,
+        opcodes.OpcodeId.addImmediateToRegOrMem,
+        opcodes.OpcodeId.subImmediateToRegOrMem,
+        opcodes.OpcodeId.cmpImmediateToRegOrMem,
+        => {
+            switch (opcodes.Mode.fromInt(inst.opcode.mod.?)) {
+                .memory_no_displacement => {
+                    const effective_address = registers.effectiveAddressRegisters(
+                        inst.opcode.regOrMem.?,
+                        inst.getDisplacement() catch |err| switch (err) {
+                            errors.InstructionErrors.NoDisplacement => 0,
+                            else => {
+                                return err;
+                            },
+                        },
+                    );
+                    const immediate = try inst.getImmediate();
+                    const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
+                    return .{
+                        .{ .effective_address = effective_address },
+                        .{ .immediate = .{ .value = immediate, .size = size } },
+                    };
                 },
-            );
-            const immediate = try inst.getImmediate();
-            const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
-            return .{
-                .{ .effective_address = effective_address },
-                .{ .immediate = .{ .value = immediate, .size = size } },
-            };
+                else => {
+                    std.debug.panic("Unsupported mod: {}", .{opcodes.Mode.fromInt(inst.opcode.mod.?)});
+                },
+            }
         },
 
         opcodes.OpcodeId.memoryToAccumulator => {
@@ -107,7 +118,16 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             };
         },
 
+        opcodes.OpcodeId.accumulatorToMemory => {
+            const immediate = try inst.getImmediate();
+            return .{
+                .{ .effective_address = .{ .r1 = .none, .r2 = .none, .displacement = immediate } },
+                .{ .register = .ax },
+            };
+        },
+
         else => {
+            std.debug.print("Got unimplemented opcode {}\n", .{inst.opcode.id});
             return .{
                 Operand.none,
                 Operand.none,
@@ -246,5 +266,45 @@ test "decodeArguments - MOV Decode - memory to accumulator narrow" {
         .r1 = .none,
         .r2 = .none,
         .displacement = 120,
+    } }, result[1]);
+}
+
+test "decodeArguments - MOV Decode - accumulator to memory, wide" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+    try std.testing.expectEqual(Operand{ .effective_address = .{
+        .r1 = .none,
+        .r2 = .none,
+        .displacement = 384,
+    } }, result[0]);
+    try std.testing.expectEqual(Operand{ .register = .ax }, result[1]);
+}
+
+// TODO - This is actually an integration test
+test "decodeInstruction - ADD immediate to reg or mem" {
+    const subject = try buildInstructionFromBytes(
+        // Note: 4th byte should be ignored due to sign extension
+        &[_]u8{ 0b1000_0011, 0b1100_0110, 0b0000_0010, 0b1000_0011, 0, 0 },
+        2,
+    );
+
+    try std.testing.expectEqualStrings("add", subject.opcode.name);
+    try std.testing.expectEqual(opcodes.OpcodeId.addImmediateToRegOrMem, subject.opcode.id);
+    try std.testing.expectEqual(true, subject.opcode.sign);
+    try std.testing.expectEqual(true, subject.opcode.wide);
+    try std.testing.expectEqual(0b11, subject.opcode.mod);
+    try std.testing.expectEqual(0b110, subject.opcode.regOrMem);
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(Operand{ .register = .si }, result[0]);
+    try std.testing.expectEqual(Operand{ .effective_address = .{
+        .r1 = .none,
+        .r2 = .none,
+        .displacement = 2,
     } }, result[1]);
 }

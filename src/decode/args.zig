@@ -245,21 +245,6 @@ fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruc
     };
 }
 
-test "decodeInstruction - MOV Decode - accumulator to memory wide" {
-    const allocator = std.testing.allocator;
-    const subject = try buildInstructionFromBytes(
-        &[_]u8{ 0b1010_0011, 0b1000_0000, 0b0000_0001, 0, 0, 0 },
-        2,
-    );
-
-    const result = try decodeArgs(allocator, subject);
-    defer result.deinit(allocator);
-
-    try std.testing.expectEqual(@as(usize, 2), result.args.len);
-    try std.testing.expectEqualStrings("[384]", result.args[0]);
-    try std.testing.expectEqualStrings("ax", result.args[1]);
-}
-
 // TODO - This is actually an integration test
 test "decodeInstruction - ADD immediate to reg or mem" {
     const allocator = std.testing.allocator;

@@ -24,38 +24,32 @@ pub const Operand = union(enum) {
 pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
     switch (inst.opcode.id) {
         opcodes.OpcodeId.movRegOrMemToFromReg => {
-            switch (opcodes.Mode.fromInt(inst.opcode.mod.?)) {
-                .memory_no_displacement => {
-                    if (inst.opcode.regOrMem == 0b110) { // Direct address
-                        const reg = registers.getRegister(
-                            inst.opcode.reg.?,
-                            inst.opcode.wide.?,
-                        );
+            const reg = registers.getRegister(
+                inst.opcode.reg.?,
+                inst.opcode.wide.?,
+            );
+            const opcode_mode = opcodes.Mode.fromInt(inst.opcode.mod.?);
+            // Direct address exception
+            if (opcode_mode == .memory_no_displacement and inst.opcode.regOrMem == 0b110) {
+                return .{
+                    Operand{ .register = reg },
+                    Operand{ .relative_address = try inst.getDisplacement() },
+                };
+            }
 
-                        return .{
-                            Operand{ .register = reg },
-                            Operand{ .relative_address = try inst.getDisplacement() },
-                        };
-                    } else {
-                        std.debug.panic("Unsupported mod {} for opcode {}", .{
-                            opcodes.Mode.fromInt(inst.opcode.mod.?),
-                            inst.opcode.id,
-                        });
-                    }
-                },
-                .register => {
-                    const dest = if (inst.opcode.regIsDestination.?) inst.opcode.reg.? else inst.opcode.regOrMem.?;
-                    const source = if (inst.opcode.regIsDestination.?) inst.opcode.regOrMem.? else inst.opcode.reg.?;
-                    return .{
-                        Operand{ .register = registers.getRegister(dest, inst.opcode.wide.?) },
-                        Operand{ .register = registers.getRegister(source, inst.opcode.wide.?) },
-                    };
-                },
-                else => {
-                    const reg = registers.getRegister(inst.opcode.reg.?, inst.opcode.wide.?);
+            switch (opcode_mode) {
+                .memory_no_displacement,
+                .memory_8_bit_displacement,
+                .memory_16_bit_displacement,
+                => {
+                    const displacement = if (opcode_mode == .memory_no_displacement)
+                        0
+                    else
+                        try inst.getDisplacement();
+
                     const effective_address = registers.effectiveAddressRegisters(
                         inst.opcode.regOrMem.?,
-                        try inst.getDisplacement(),
+                        displacement,
                     );
                     if (inst.opcode.regIsDestination orelse false) {
                         return .{
@@ -65,6 +59,20 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                     } else {
                         return .{
                             Operand{ .effective_address = effective_address },
+                            Operand{ .register = reg },
+                        };
+                    }
+                },
+                .register => {
+                    const regOrMem = registers.getRegister(inst.opcode.regOrMem.?, inst.opcode.wide.?);
+                    if (inst.opcode.regIsDestination orelse false) {
+                        return .{
+                            Operand{ .register = reg },
+                            Operand{ .register = regOrMem },
+                        };
+                    } else {
+                        return .{
+                            Operand{ .register = regOrMem },
                             Operand{ .register = reg },
                         };
                     }
@@ -88,8 +96,21 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
         => {
             const immediate = try inst.getImmediate();
 
-            switch (opcodes.Mode.fromInt(inst.opcode.mod.?)) {
-                .memory_no_displacement => {
+            const opcode_mode = opcodes.Mode.fromInt(inst.opcode.mod.?);
+            // Direct address exception
+            if (opcode_mode == .memory_no_displacement and inst.opcode.regOrMem == 0b110) {
+                const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
+                return .{
+                    .{ .relative_address = try inst.getDisplacement() },
+                    .{ .immediate = .{ .value = immediate, .size = size } },
+                };
+            }
+
+            switch (opcode_mode) {
+                .memory_no_displacement,
+                .memory_8_bit_displacement,
+                .memory_16_bit_displacement,
+                => {
                     const effective_address = registers.effectiveAddressRegisters(
                         inst.opcode.regOrMem.?,
                         inst.getDisplacement() catch |err| switch (err) {
@@ -111,12 +132,6 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                         .{ .register = reg },
                         .{ .immediate = .{ .value = immediate, .size = .registerDefined } },
                     };
-                },
-                else => {
-                    std.debug.panic("Unsupported mod {} for opcode {}", .{
-                        opcodes.Mode.fromInt(inst.opcode.mod.?),
-                        inst.opcode.id,
-                    });
                 },
             }
         },

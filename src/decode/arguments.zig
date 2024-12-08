@@ -37,10 +37,10 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                             Operand{ .relative_address = try inst.getDisplacement() },
                         };
                     } else {
-                        return .{
-                            Operand.none,
-                            Operand.none,
-                        };
+                        std.debug.panic("Unsupported mod {} for opcode {}", .{
+                            opcodes.Mode.fromInt(inst.opcode.mod.?),
+                            inst.opcode.id,
+                        });
                     }
                 },
                 .register => {
@@ -86,6 +86,8 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
         opcodes.OpcodeId.subImmediateToRegOrMem,
         opcodes.OpcodeId.cmpImmediateToRegOrMem,
         => {
+            const immediate = try inst.getImmediate();
+
             switch (opcodes.Mode.fromInt(inst.opcode.mod.?)) {
                 .memory_no_displacement => {
                     const effective_address = registers.effectiveAddressRegisters(
@@ -97,15 +99,24 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
                             },
                         },
                     );
-                    const immediate = try inst.getImmediate();
                     const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
                     return .{
                         .{ .effective_address = effective_address },
                         .{ .immediate = .{ .value = immediate, .size = size } },
                     };
                 },
+                .register => {
+                    const reg = registers.getRegister(inst.opcode.regOrMem.?, inst.opcode.wide.?);
+                    return .{
+                        .{ .register = reg },
+                        .{ .immediate = .{ .value = immediate, .size = .registerDefined } },
+                    };
+                },
                 else => {
-                    std.debug.panic("Unsupported mod: {}", .{opcodes.Mode.fromInt(inst.opcode.mod.?)});
+                    std.debug.panic("Unsupported mod {} for opcode {}", .{
+                        opcodes.Mode.fromInt(inst.opcode.mod.?),
+                        inst.opcode.id,
+                    });
                 },
             }
         },
@@ -127,11 +138,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
         },
 
         else => {
-            std.debug.print("Got unimplemented opcode {}\n", .{inst.opcode.id});
-            return .{
-                Operand.none,
-                Operand.none,
-            };
+            std.debug.panic("Got unimplemented opcode {}\n", .{inst.opcode.id});
         },
     }
 }
@@ -302,9 +309,5 @@ test "decodeInstruction - ADD immediate to reg or mem" {
     const result = try decodeArguments(subject);
 
     try std.testing.expectEqual(Operand{ .register = .si }, result[0]);
-    try std.testing.expectEqual(Operand{ .effective_address = .{
-        .r1 = .none,
-        .r2 = .none,
-        .displacement = 2,
-    } }, result[1]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = 2, .size = .registerDefined } }, result[1]);
 }

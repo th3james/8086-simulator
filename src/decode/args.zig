@@ -245,30 +245,6 @@ fn buildInstructionFromBytes(bytes: []const u8, length: u4) !instruction.Instruc
     };
 }
 
-// TODO - This is actually an integration test
-test "decodeInstruction - ADD immediate to reg or mem" {
-    const allocator = std.testing.allocator;
-    const subject = try buildInstructionFromBytes(
-        // Note: 4th byte should be ignored due to sign extension
-        &[_]u8{ 0b1000_0011, 0b1100_0110, 0b0000_0010, 0b1000_0011, 0, 0 },
-        2,
-    );
-
-    try std.testing.expectEqualStrings("add", subject.opcode.name);
-    try std.testing.expectEqual(opcodes.OpcodeId.addImmediateToRegOrMem, subject.opcode.id);
-    try std.testing.expectEqual(true, subject.opcode.sign);
-    try std.testing.expectEqual(true, subject.opcode.wide);
-    try std.testing.expectEqual(0b11, subject.opcode.mod);
-    try std.testing.expectEqual(0b110, subject.opcode.regOrMem);
-
-    const result = try decodeArgs(allocator, subject);
-    defer result.deinit(allocator);
-
-    try std.testing.expectEqual(@as(usize, 2), result.args.len);
-    try std.testing.expectEqualStrings("si", result.args[0]);
-    try std.testing.expectEqualStrings("2", result.args[1]);
-}
-
 test "decodeInstruction - JNZ" {
     const allocator = std.testing.allocator;
     const subject = try buildInstructionFromBytes(

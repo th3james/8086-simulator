@@ -21,7 +21,9 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
         },
         .effective_address => |*addr| {
             try writer.writeAll("[");
-            try writer.writeAll(@tagName(addr.r1));
+            if (addr.r1 != registers.Register.none) {
+                try writer.writeAll(@tagName(addr.r1));
+            }
 
             if (addr.r2 != registers.Register.none) {
                 try writer.writeAll(" + ");
@@ -29,10 +31,12 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
             }
 
             if (addr.displacement != 0) {
-                if (addr.displacement > 0) {
-                    try writer.writeAll(" + ");
-                } else {
-                    try writer.writeAll(" - ");
+                if (addr.r1 != registers.Register.none) {
+                    if (addr.displacement > 0) {
+                        try writer.writeAll(" + ");
+                    } else {
+                        try writer.writeAll(" - ");
+                    }
                 }
 
                 try std.fmt.formatInt(
@@ -124,6 +128,19 @@ test "operandToString - EffectiveAddress with negative displacement" {
     );
 
     try std.testing.expectEqualStrings("[bx + di - 37]", result_buffer.items);
+}
+
+test "operandToString - EffectiveAddress effective address with none registers" {
+    var result_buffer = try std.ArrayList(u8).initCapacity(std.testing.allocator, 14);
+    defer result_buffer.deinit();
+    const address = registers.EffectiveAddress{ .r1 = .none, .r2 = .none, .displacement = 42 };
+
+    try operandToString(
+        result_buffer.writer(),
+        decode_arguments.Operand{ .effective_address = address },
+    );
+
+    try std.testing.expectEqualStrings("[42]", result_buffer.items);
 }
 
 test "operandToString - register defined immediate" {

@@ -157,12 +157,23 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
         },
 
         .addImmediateToAccumulator => {
-            const immediate = try inst.getImmediate();
-
-            return .{
-                .{ .register = .ax },
-                .{ .immediate = .{ .value = immediate, .size = .registerDefined } },
+            const immediate_operand = .{
+                .immediate = .{
+                    .value = try inst.getImmediate(),
+                    .size = .registerDefined,
+                },
             };
+            if (inst.opcode.wide.?) {
+                return .{
+                    .{ .register = .ax },
+                    immediate_operand,
+                };
+            } else {
+                return .{
+                    .{ .register = .al },
+                    immediate_operand,
+                };
+            }
         },
 
         else => {
@@ -349,6 +360,18 @@ test "decodeArguments -  ADD immediate to accumulator narrow" {
 
     const result = try decodeArguments(subject);
 
-    try std.testing.expectEqual(Operand{ .register = .ax }, result[0]);
+    try std.testing.expectEqual(Operand{ .register = .al }, result[0]);
     try std.testing.expectEqual(Operand{ .immediate = .{ .value = 43, .size = .registerDefined } }, result[1]);
+}
+
+test "decodeArguments -  ADD immediate to accumulator wide" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b0000_0101, 2, 1, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(Operand{ .register = .ax }, result[0]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = 258, .size = .registerDefined } }, result[1]);
 }

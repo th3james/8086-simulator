@@ -156,6 +156,15 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             };
         },
 
+        .addImmediateToAccumulator => {
+            const immediate = try inst.getImmediate();
+
+            return .{
+                .{ .register = .ax },
+                .{ .immediate = .{ .value = immediate, .size = .registerDefined } },
+            };
+        },
+
         else => {
             std.debug.panic("Got unimplemented opcode {}\n", .{inst.opcode.id});
         },
@@ -330,4 +339,16 @@ test "decodeInstruction - ADD immediate to reg or mem" {
 
     try std.testing.expectEqual(Operand{ .register = .si }, result[0]);
     try std.testing.expectEqual(Operand{ .immediate = .{ .value = 2, .size = .registerDefined } }, result[1]);
+}
+
+test "decodeArguments -  ADD immediate to accumulator narrow" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b0000_0100, 43, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(Operand{ .register = .ax }, result[0]);
+    try std.testing.expectEqual(Operand{ .immediate = .{ .value = 43, .size = .registerDefined } }, result[1]);
 }

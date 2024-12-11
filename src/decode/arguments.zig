@@ -23,7 +23,11 @@ pub const Operand = union(enum) {
 
 pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
     switch (inst.opcode.id) {
-        opcodes.OpcodeId.movRegOrMemToFromReg => {
+        .movRegOrMemToFromReg,
+        .addRegOrMemToEither,
+        .subRegOrMemToEither,
+        .cmpRegOrMemToReg,
+        => {
             const reg = registers.getRegister(
                 inst.opcode.reg.?,
                 inst.opcode.wide.?,
@@ -80,7 +84,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             }
         },
 
-        opcodes.OpcodeId.movImmediateToReg => {
+        .movImmediateToReg => {
             const reg = registers.getRegister(inst.opcode.reg.?, inst.opcode.wide.?);
             const immediate = try inst.getImmediate();
             return .{
@@ -89,10 +93,10 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             };
         },
 
-        opcodes.OpcodeId.movImmediateToRegOrMem,
-        opcodes.OpcodeId.addImmediateToRegOrMem,
-        opcodes.OpcodeId.subImmediateToRegOrMem,
-        opcodes.OpcodeId.cmpImmediateToRegOrMem,
+        .movImmediateToRegOrMem,
+        .addImmediateToRegOrMem,
+        .subImmediateToRegOrMem,
+        .cmpImmediateToRegOrMem,
         => {
             const immediate = try inst.getImmediate();
 
@@ -136,7 +140,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             }
         },
 
-        opcodes.OpcodeId.memoryToAccumulator => {
+        .memoryToAccumulator => {
             const immediate = try inst.getImmediate();
             return .{
                 .{ .register = .ax },
@@ -144,7 +148,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             };
         },
 
-        opcodes.OpcodeId.accumulatorToMemory => {
+        .accumulatorToMemory => {
             const immediate = try inst.getImmediate();
             return .{
                 .{ .effective_address = .{ .r1 = .none, .r2 = .none, .displacement = immediate } },
@@ -298,6 +302,7 @@ test "decodeArguments - MOV Decode - accumulator to memory, wide" {
     );
 
     const result = try decodeArguments(subject);
+
     try std.testing.expectEqual(Operand{ .effective_address = .{
         .r1 = .none,
         .r2 = .none,

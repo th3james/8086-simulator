@@ -8,7 +8,7 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
         .register => |*r| {
             try writer.writeAll(@tagName(r.*));
         },
-        .relative_address => |*a| {
+        .absolute_address => |*a| {
             try writer.writeAll("[");
             try std.fmt.formatInt(
                 @abs(a.*),
@@ -18,6 +18,9 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
                 writer,
             );
             try writer.writeAll("]");
+        },
+        .relative_address => |*a| {
+            try writer.print("{d}", .{a.*});
         },
         .effective_address => |*addr| {
             try writer.writeAll("[");
@@ -195,8 +198,10 @@ pub fn instructionToString(
     try writer.writeAll(" ");
 
     try operandToString(writer, args[0]);
-    try writer.writeAll(", ");
-    try operandToString(writer, args[1]);
+    if (args[1] != .none) {
+        try writer.writeAll(", ");
+        try operandToString(writer, args[1]);
+    }
 
     return result_buffer.toOwnedSlice();
 }
@@ -217,11 +222,11 @@ test "instructionToString - register arguments" {
     try std.testing.expectEqualStrings("mov cl, al", result);
 }
 
-test "instructionToString - relative address arguments" {
+test "instructionToString - absolute address arguments" {
     const allocator = std.testing.allocator;
     const args = [_]decode_arguments.Operand{
         .{ .register = registers.Register.al },
-        .{ .relative_address = 257 },
+        .{ .absolute_address = 257 },
     };
     const result = try instructionToString(
         std.testing.allocator,
@@ -231,4 +236,20 @@ test "instructionToString - relative address arguments" {
     defer allocator.free(result);
 
     try std.testing.expectEqualStrings("mov al, [257]", result);
+}
+
+test "instructionToString - jmp with negative relative address argument" {
+    const allocator = std.testing.allocator;
+    const args = [_]decode_arguments.Operand{
+        .{ .relative_address = -257 },
+        .none,
+    };
+    const result = try instructionToString(
+        std.testing.allocator,
+        "jmp",
+        args,
+    );
+    defer allocator.free(result);
+
+    try std.testing.expectEqualStrings("jmp -257", result);
 }

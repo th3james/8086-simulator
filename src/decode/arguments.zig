@@ -15,6 +15,7 @@ const Immediate = struct {
 
 pub const Operand = union(enum) {
     register: registers.Register,
+    absolute_address: i16, // TODO I think this should be unsigned
     relative_address: i16,
     immediate: Immediate, // TODO might need an unsigned variant?
     effective_address: registers.EffectiveAddress,
@@ -37,7 +38,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             if (opcode_mode == .memory_no_displacement and inst.opcode.regOrMem == 0b110) {
                 return .{
                     Operand{ .register = reg },
-                    Operand{ .relative_address = try inst.getDisplacement() },
+                    Operand{ .absolute_address = try inst.getDisplacement() },
                 };
             }
 
@@ -105,7 +106,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             if (opcode_mode == .memory_no_displacement and inst.opcode.regOrMem == 0b110) {
                 const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
                 return .{
-                    .{ .relative_address = try inst.getDisplacement() },
+                    .{ .absolute_address = try inst.getDisplacement() },
                     .{ .immediate = .{ .value = immediate, .size = size } },
                 };
             }
@@ -179,8 +180,31 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             }
         },
 
-        else => {
-            std.debug.panic("Got unimplemented opcode {}\n", .{inst.opcode.id});
+        .jmpIfZero,
+        .jmpIfNotZero,
+        .jmpIfLess,
+        .jmpIfLessOrEq,
+        .jmpIfBelow,
+        .jmpIfBelowOrEq,
+        .jmpIfParity,
+        .jmpOnOverflow,
+        .jmpOnSign,
+        .jmpIfGreater,
+        .jmpIfGreaterOrEq,
+        .jmpIfAbove,
+        .jmpIfAboveOrEq,
+        .jmpIfParOdd,
+        .jmpOnNotOverflow,
+        .jmpOnNotSign,
+        .loopCxTimes,
+        .loopIfZero,
+        .loopIfNotZero,
+        .jmpIfCxZero,
+        => {
+            return .{
+                Operand{ .relative_address = try inst.getDisplacement() },
+                .none,
+            };
         },
     }
 }
@@ -216,7 +240,7 @@ test "decodeArguments - MOV Direct address" {
     const result = try decodeArguments(subject);
 
     try std.testing.expectEqual(registers.Register.al, result[0].register);
-    try std.testing.expectEqual(Operand{ .relative_address = 257 }, result[1]);
+    try std.testing.expectEqual(Operand{ .absolute_address = 257 }, result[1]);
 }
 
 test "decodeArguments - MOV reg or memory" {
@@ -367,7 +391,7 @@ test "decodeArguments -  ADD immediate to accumulator narrow" {
     try std.testing.expectEqual(Operand{ .immediate = .{ .value = 43, .size = .registerDefined } }, result[1]);
 }
 
-test "decodeArguments -  ADD immediate to accumulator wide" {
+test "decodeArguments - ADD immediate to accumulator wide" {
     const subject = try buildInstructionFromBytes(
         &[_]u8{ 0b0000_0101, 2, 1, 0, 0, 0 },
         2,
@@ -377,4 +401,16 @@ test "decodeArguments -  ADD immediate to accumulator wide" {
 
     try std.testing.expectEqual(Operand{ .register = .ax }, result[0]);
     try std.testing.expectEqual(Operand{ .immediate = .{ .value = 258, .size = .registerDefined } }, result[1]);
+}
+
+test "decodeArguments - JNZ" {
+    const subject = try buildInstructionFromBytes(
+        &[_]u8{ 0b0111_0101, 34, 0, 0, 0, 0 },
+        2,
+    );
+
+    const result = try decodeArguments(subject);
+
+    try std.testing.expectEqual(Operand{ .relative_address = 34 }, result[0]);
+    try std.testing.expectEqual(.none, result[1]);
 }

@@ -18,20 +18,40 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len != 2) {
-        std.debug.print("Usage: {s} <file_path>\n", .{args[0]});
-        std.process.exit(1);
-    }
-
-    const file_path = args[1];
+    const parsed_args = try parseArgs(args);
 
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
 
-    const program_len = try memory.loadFromFile(file_path, emu_mem);
+    const program_len = try memory.loadFromFile(parsed_args.file_path, emu_mem);
     assert(program_len > 0);
 
     try disassemble(&allocator, emu_mem, program_len);
+}
+
+const ParsedArgs = struct { file_path: []const u8, execute: bool };
+
+fn parseArgs(args: []const []const u8) !ParsedArgs {
+    if (args.len == 3) {
+        if (std.mem.eql(u8, args[1], "--execute")) {
+            return .{
+                .file_path = args[2],
+                .execute = true,
+            };
+        } else {
+            // TODO return error
+            std.debug.print("Usage: {s} |--execute| <file_path>\n", .{args[0]});
+            std.process.exit(1);
+        }
+    } else if (args.len == 2) {
+        return .{
+            .file_path = args[1],
+            .execute = true,
+        };
+    } else {
+        std.debug.print("Usage: {s} |--execute| <file_path>\n", .{args[0]});
+        std.process.exit(1);
+    }
 }
 
 fn decodeOpcodeAtAddress(mem: *memory.Memory, start_addr: u32, limit_addr: u32) !opcodes.DecodedOpcode {

@@ -18,7 +18,10 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    const parsed_args = try parseArgs(args);
+    const parsed_args = parseArgs(args) catch {
+        std.debug.print("Usage: {s} |--execute| <file_path>\n", .{args[0]});
+        std.process.exit(1);
+    };
 
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
@@ -26,10 +29,55 @@ pub fn main() !void {
     const program_len = try memory.loadFromFile(parsed_args.file_path, emu_mem);
     assert(program_len > 0);
 
-    try disassemble(&allocator, emu_mem, program_len);
+    const stdout_file = std.io.getStdOut().writer();
+    var bw = std.io.bufferedWriter(stdout_file);
+    const stdout = bw.writer();
+
+    try stdout.print("bits 16\n", .{});
+
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    // Main loop through memory
+    var memory_address: u32 = 0;
+    while (memory_address < program_len) {
+        _ = arena.reset(.retain_capacity);
+        const arena_allocator = arena.allocator();
+
+        const opcode = try decodeOpcodeAtAddress(emu_mem, memory_address, program_len);
+
+        const layout = instruction_layout.getInstructionLayout(opcode);
+
+        const instruction_end = memory_address + instruction_layout.getInstructionLength(opcode.length, layout);
+        assert(instruction_end > memory_address);
+        assert((instruction_end - memory_address) <= instruction_layout.MAX_INSTRUCTION_LENGTH);
+
+        const instruction_bytes = if (instruction_end <= program_len)
+            memory.sliceMemory(emu_mem, memory_address, instruction_end)
+        else
+            return InvalidBinaryErrors.IncompleteInstruction;
+        memory_address = instruction_end;
+
+        const current_instruction = instruction.Instruction{
+            .bytes = instruction_bytes,
+            .opcode = opcode,
+            .layout = layout,
+        };
+
+        const instruction_args = try decode_arguments.decodeArguments(current_instruction);
+
+        const instruction_str = try decode_print.instructionToString(
+            arena_allocator,
+            opcode.name,
+            instruction_args,
+        );
+        try stdout.print("{s}\n", .{instruction_str});
+    }
+    try bw.flush();
 }
 
 const ParsedArgs = struct { file_path: []const u8, execute: bool };
+const ArgumentErrors = error{InvalidArgument};
 
 fn parseArgs(args: []const []const u8) !ParsedArgs {
     if (args.len == 3) {
@@ -39,9 +87,7 @@ fn parseArgs(args: []const []const u8) !ParsedArgs {
                 .execute = true,
             };
         } else {
-            // TODO return error
-            std.debug.print("Usage: {s} |--execute| <file_path>\n", .{args[0]});
-            std.process.exit(1);
+            return ArgumentErrors.InvalidArgument;
         }
     } else if (args.len == 2) {
         return .{
@@ -49,8 +95,7 @@ fn parseArgs(args: []const []const u8) !ParsedArgs {
             .execute = true,
         };
     } else {
-        std.debug.print("Usage: {s} |--execute| <file_path>\n", .{args[0]});
-        std.process.exit(1);
+        return ArgumentErrors.InvalidArgument;
     }
 }
 
@@ -138,54 +183,6 @@ test "decodeOpcodeAtAddress - an incomplete instruction it returns error" {
     const result = decodeOpcodeAtAddress(mem, 0, 1);
 
     try std.testing.expectError(InvalidBinaryErrors.IncompleteInstruction, result);
-}
-
-fn disassemble(allocator: *std.mem.Allocator, mem: *memory.Memory, program_len: u32) !void {
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("bits 16\n", .{});
-
-    var arena = std.heap.ArenaAllocator.init(allocator.*);
-    defer arena.deinit();
-
-    var memory_address: u32 = 0;
-    while (memory_address < program_len) {
-        _ = arena.reset(.retain_capacity);
-        const arena_allocator = arena.allocator();
-
-        const opcode = try decodeOpcodeAtAddress(mem, memory_address, program_len);
-
-        const layout = instruction_layout.getInstructionLayout(opcode);
-
-        const instruction_end = memory_address + instruction_layout.getInstructionLength(opcode.length, layout);
-        assert(instruction_end > memory_address);
-        assert((instruction_end - memory_address) <= instruction_layout.MAX_INSTRUCTION_LENGTH);
-
-        const instruction_bytes = if (instruction_end <= program_len)
-            memory.sliceMemory(mem, memory_address, instruction_end)
-        else
-            return InvalidBinaryErrors.IncompleteInstruction;
-        memory_address = instruction_end;
-
-        const current_instruction = instruction.Instruction{
-            .bytes = instruction_bytes,
-            .opcode = opcode,
-            .layout = layout,
-        };
-
-        const instruction_args = try decode_arguments.decodeArguments(current_instruction);
-
-        const instruction_str = try decode_print.instructionToString(
-            arena_allocator,
-            opcode.name,
-            instruction_args,
-        );
-        try stdout.print("{s}\n", .{instruction_str});
-    }
-
-    try bw.flush();
 }
 
 test {

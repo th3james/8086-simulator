@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const memory = @import("memory.zig");
+const reg = @import("registers.zig");
 const opcodes = @import("decode/opcodes.zig");
 const instruction_layout = @import("decode/instruction_layout.zig");
 const decode_errors = @import("decode/errors.zig");
@@ -23,6 +24,8 @@ pub fn main() !void {
         std.process.exit(1);
     };
 
+    // Init system
+    const registers = reg.Registers{};
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
 
@@ -44,6 +47,7 @@ pub fn main() !void {
         _ = arena.reset(.retain_capacity);
         const arena_allocator = arena.allocator();
 
+        // Decode
         const opcode = try decodeOpcodeAtAddress(emu_mem, memory_address, program_len);
 
         const layout = instruction_layout.getInstructionLayout(opcode);
@@ -55,6 +59,7 @@ pub fn main() !void {
         const instruction_bytes = if (instruction_end <= program_len)
             memory.sliceMemory(emu_mem, memory_address, instruction_end)
         else
+            // TODO handle this error
             return InvalidBinaryErrors.IncompleteInstruction;
         memory_address = instruction_end;
 
@@ -71,7 +76,24 @@ pub fn main() !void {
             opcode.name,
             instruction_args,
         );
-        try stdout.print("{s}\n", .{instruction_str});
+        try stdout.print("{s}", .{instruction_str});
+
+        // Execute
+        if (parsed_args.execute) {
+            if (std.mem.eql(u8, opcode.name, "mov")) {
+                if (instruction_args[0] == .register) {
+                    if (instruction_args[0].register == .ax) {
+                        if (instruction_args[1] == .immediate) {
+                            const current_val = registers.ax;
+                            const new_value = instruction_args[1].immediate.value;
+                            try stdout.print(" ; ax:0x{x}->0x{x}", .{ current_val, new_value });
+                        }
+                    }
+                }
+            }
+        }
+
+        try stdout.print("\n", .{});
     }
     try bw.flush();
 }
@@ -92,7 +114,7 @@ fn parseArgs(args: []const []const u8) !ParsedArgs {
     } else if (args.len == 2) {
         return .{
             .file_path = args[1],
-            .execute = true,
+            .execute = false,
         };
     } else {
         return ArgumentErrors.InvalidArgument;

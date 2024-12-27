@@ -36,7 +36,9 @@ pub fn main() !void {
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    try stdout.print("bits 16\n", .{});
+    if (!parsed_args.execute) {
+        try stdout.print("bits 16\n", .{});
+    }
 
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

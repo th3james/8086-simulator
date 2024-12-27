@@ -29,21 +29,6 @@ test "getRegister gets register" {
     try std.testing.expectEqual(Register.cx, getRegister(0b001, true));
 }
 
-// TODO delete
-pub fn registerName(reg: u3, wide: bool) []const u8 {
-    if (reg >= registerMap.len) {
-        return "xx"; // Unknown or invalid register code
-    }
-
-    const names = registerMap[reg];
-    return @tagName(if (wide) names.wide else names.narrow);
-}
-
-test "registerName options" {
-    try std.testing.expectEqualStrings("al", registerName(0b000, false));
-    try std.testing.expectEqualStrings("cx", registerName(0b001, true));
-}
-
 const effectiveAddressRegisterMap = [_][2]Register{
     .{ Register.bx, Register.si },
     .{ Register.bx, Register.di },

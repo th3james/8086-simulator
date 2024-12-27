@@ -84,12 +84,14 @@ pub fn main() !void {
         if (parsed_args.execute) {
             if (std.mem.eql(u8, opcode.name, "mov")) {
                 if (instruction_args[0] == .register) {
-                    if (instruction_args[0].register == .ax) {
-                        if (instruction_args[1] == .immediate) {
-                            const current_val = registers.ax;
-                            const new_value = instruction_args[1].immediate.value;
-                            try stdout.print(" ; ax:0x{x}->0x{x}", .{ current_val, new_value });
-                        }
+                    if (instruction_args[1] == .immediate) {
+                        const current_val = registers.ax;
+                        const new_value = instruction_args[1].immediate.value;
+                        try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                            @tagName(instruction_args[0].register),
+                            current_val,
+                            new_value,
+                        });
                     }
                 }
             }

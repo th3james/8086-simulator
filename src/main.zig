@@ -102,7 +102,19 @@ pub fn main() !void {
     }
 
     if (parsed_args.execute) {
-        try stdout.print("Final registers:", .{});
+        try stdout.print("Final registers:\n", .{});
+
+        const info = @typeInfo(reg.Registers);
+
+        switch (info) {
+            .Struct => |struct_info| {
+                inline for (struct_info.fields) |field_info| {
+                    const reg_name = field_info.name;
+                    try stdout.print("\t{s}:\n", .{reg_name});
+                }
+            },
+            else => unreachable,
+        }
     }
     try bw.flush();
 }

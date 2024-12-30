@@ -25,7 +25,7 @@ pub fn main() !void {
     };
 
     // Init system
-    const registers = reg.Registers{};
+    var registers = reg.Registers{};
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
 
@@ -85,7 +85,8 @@ pub fn main() !void {
             if (std.mem.eql(u8, opcode.name, "mov")) {
                 if (instruction_args[0] == .register) {
                     if (instruction_args[1] == .immediate) {
-                        const current_val = registers.ax;
+                        const source_reg = reg.getWideReg(&registers, instruction_args[0].register);
+                        const current_val = source_reg.*;
                         const new_value = instruction_args[1].immediate.value;
                         try stdout.print(" ; {s}:0x{x}->0x{x}", .{
                             @tagName(instruction_args[0].register),
@@ -98,6 +99,10 @@ pub fn main() !void {
         }
 
         try stdout.print("\n", .{});
+    }
+
+    if (parsed_args.execute) {
+        try stdout.print("Final registers:", .{});
     }
     try bw.flush();
 }

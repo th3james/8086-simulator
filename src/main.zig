@@ -88,6 +88,7 @@ pub fn main() !void {
                         const source_reg = reg.getWideReg(&registers, instruction_args[0].register);
                         const current_val = source_reg.*;
                         const new_value = instruction_args[1].immediate.value;
+                        source_reg.* = @bitCast(new_value);
                         try stdout.print(" ; {s}:0x{x}->0x{x}", .{
                             @tagName(instruction_args[0].register),
                             current_val,
@@ -102,6 +103,7 @@ pub fn main() !void {
     }
 
     if (parsed_args.execute) {
+        // Print register values
         try stdout.print("Final registers:\n", .{});
 
         const info = @typeInfo(reg.Registers);
@@ -110,7 +112,18 @@ pub fn main() !void {
             .Struct => |struct_info| {
                 inline for (struct_info.fields) |field_info| {
                     const reg_name = field_info.name;
-                    try stdout.print("\t{s}:\n", .{reg_name});
+                    const reg_value = @field(registers, reg_name);
+
+                    switch (@typeInfo(field_info.type)) {
+                        .Int => {
+                            if (reg_value != 0) {
+                                try stdout.print("      {s}: 0x{x:0>4} ({d})\n", .{ reg_name, reg_value, reg_value });
+                            }
+                        },
+                        else => {
+                            unreachable;
+                        },
+                    }
                 }
             },
             else => unreachable,

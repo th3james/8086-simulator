@@ -84,16 +84,31 @@ pub fn main() !void {
         if (parsed_args.execute) {
             if (std.mem.eql(u8, opcode.name, "mov")) {
                 if (instruction_args[0] == .register) {
-                    if (instruction_args[1] == .immediate) {
-                        const source_reg = reg.getWideReg(&registers, instruction_args[0].register);
-                        const current_val = source_reg.*;
-                        const new_value = instruction_args[1].immediate.value;
-                        source_reg.* = @bitCast(new_value);
-                        try stdout.print(" ; {s}:0x{x}->0x{x}", .{
-                            @tagName(instruction_args[0].register),
-                            current_val,
-                            new_value,
-                        });
+                    const target_reg_name = @tagName(instruction_args[0].register);
+                    const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
+                    const current_val = target_reg.*;
+
+                    switch (instruction_args[1]) {
+                        .immediate => {
+                            const new_value = instruction_args[1].immediate.value;
+                            target_reg.* = @bitCast(new_value);
+                            try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                                target_reg_name,
+                                current_val,
+                                new_value,
+                            });
+                        },
+                        .register => {
+                            const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
+                            const new_value = source_reg.*;
+                            target_reg.* = new_value;
+                            try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                                target_reg_name,
+                                current_val,
+                                new_value,
+                            });
+                        },
+                        else => {},
                     }
                 }
             }

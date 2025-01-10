@@ -15,9 +15,9 @@ const Immediate = struct {
 
 pub const Operand = union(enum) {
     register: registers.Register,
-    absolute_address: i16, // TODO I think this should be unsigned
+    absolute_address: u16,
     relative_address: i16,
-    immediate: Immediate, // TODO might need an unsigned variant?
+    immediate: Immediate,
     effective_address: registers.EffectiveAddress,
     none,
 };
@@ -38,7 +38,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             if (opcode_mode == .memory_no_displacement and inst.opcode.regOrMem == 0b110) {
                 return .{
                     Operand{ .register = reg },
-                    Operand{ .absolute_address = try inst.getDisplacement() },
+                    Operand{ .absolute_address = @bitCast(try inst.getDisplacement()) },
                 };
             }
 
@@ -106,7 +106,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
             if (opcode_mode == .memory_no_displacement and inst.opcode.regOrMem == 0b110) {
                 const size: ImmediateSize = if (inst.opcode.wide.?) .word else .byte;
                 return .{
-                    .{ .absolute_address = try inst.getDisplacement() },
+                    .{ .absolute_address = @bitCast(try inst.getDisplacement()) },
                     .{ .immediate = .{ .value = immediate, .size = size } },
                 };
             }

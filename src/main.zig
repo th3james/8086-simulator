@@ -90,22 +90,20 @@ pub fn main() !void {
 
                     switch (instruction_args[1]) {
                         .immediate => {
-                            const new_value = instruction_args[1].immediate.value;
-                            target_reg.* = @bitCast(new_value);
+                            target_reg.* = @bitCast(instruction_args[1].immediate.value);
                             try stdout.print(" ; {s}:0x{x}->0x{x}", .{
                                 target_reg_name,
                                 current_val,
-                                new_value,
+                                target_reg.*,
                             });
                         },
                         .register => {
                             const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
-                            const new_value = source_reg.*;
-                            target_reg.* = new_value;
+                            target_reg.* = source_reg.*;
                             try stdout.print(" ; {s}:0x{x}->0x{x}", .{
                                 target_reg_name,
                                 current_val,
-                                new_value,
+                                target_reg.*,
                             });
                         },
                         else => {},

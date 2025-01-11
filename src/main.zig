@@ -100,7 +100,7 @@ pub fn main() !void {
                         if (std.mem.eql(u8, opcode.name, "mov")) {
                             target_reg.* = source_reg.*;
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
-                            target_reg.* -= source_reg.*;
+                            target_reg.* = target_reg.* -% source_reg.*;
                         }
                     },
                     else => {},

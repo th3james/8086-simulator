@@ -82,32 +82,39 @@ pub fn main() !void {
 
         // Execute
         if (parsed_args.execute) {
-            if (std.mem.eql(u8, opcode.name, "mov")) {
-                if (instruction_args[0] == .register) {
-                    const target_reg_name = @tagName(instruction_args[0].register);
-                    const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
-                    const current_val = target_reg.*;
+            if (instruction_args[0] == .register) {
+                const target_reg_name = @tagName(instruction_args[0].register);
+                const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
+                const current_val = target_reg.*;
 
-                    switch (instruction_args[1]) {
-                        .immediate => {
+                switch (instruction_args[1]) {
+                    .immediate => {
+                        if (std.mem.eql(u8, opcode.name, "mov")) {
                             target_reg.* = @bitCast(instruction_args[1].immediate.value);
-                            try stdout.print(" ; {s}:0x{x}->0x{x}", .{
-                                target_reg_name,
-                                current_val,
-                                target_reg.*,
-                            });
-                        },
-                        .register => {
-                            const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
+                        } else if (std.mem.eql(u8, opcode.name, "sub")) {
+                            // TODO handle underflow
+                            // target_reg.* -= @bitCast(instruction_args[1].immediate.value);
+                        }
+                        try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                            target_reg_name,
+                            current_val,
+                            target_reg.*,
+                        });
+                    },
+                    .register => {
+                        const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
+                        if (std.mem.eql(u8, opcode.name, "mov")) {
                             target_reg.* = source_reg.*;
-                            try stdout.print(" ; {s}:0x{x}->0x{x}", .{
-                                target_reg_name,
-                                current_val,
-                                target_reg.*,
-                            });
-                        },
-                        else => {},
-                    }
+                        } else if (std.mem.eql(u8, opcode.name, "sub")) {
+                            target_reg.* -= source_reg.*;
+                        }
+                        try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                            target_reg_name,
+                            current_val,
+                            target_reg.*,
+                        });
+                    },
+                    else => {},
                 }
             }
         }

@@ -91,16 +91,54 @@ pub fn main() !void {
                     .immediate => {
                         if (std.mem.eql(u8, opcode.name, "mov")) {
                             target_reg.* = @bitCast(instruction_args[1].immediate.value);
+                        } else if (std.mem.eql(u8, opcode.name, "add")) {
+                            target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
+                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
+                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                            } else {
+                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                            }
+                        } else if (std.mem.eql(u8, opcode.name, "cmp")) {
+                            const comparison = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
+                            if ((comparison & 0b1000_0000_0000_0000) != 0) {
+                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                            } else {
+                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                            }
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
+                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
+                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                            } else {
+                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                            }
                         }
                     },
                     .register => {
                         const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
                         if (std.mem.eql(u8, opcode.name, "mov")) {
                             target_reg.* = source_reg.*;
+                        } else if (std.mem.eql(u8, opcode.name, "add")) {
+                            target_reg.* = target_reg.* +% source_reg.*;
+                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
+                                try stdout.print("Flags S {b}", .{target_reg.*});
+                            } else {
+                                try stdout.print("Flags no S {b}", .{target_reg.*});
+                            }
+                        } else if (std.mem.eql(u8, opcode.name, "cmp")) {
+                            const comparison = target_reg.* -% source_reg.*;
+                            if ((comparison & 0b1000_0000_0000_0000) != 0) {
+                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                            } else {
+                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                            }
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% source_reg.*;
+                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
+                                try stdout.print("Flags S {b}", .{target_reg.*});
+                            } else {
+                                try stdout.print("Flags no S {b}", .{target_reg.*});
+                            }
                         }
                     },
                     else => {},

@@ -26,6 +26,7 @@ pub fn main() !void {
 
     // Init system
     var registers = reg.Registers{};
+    var flags = reg.Flags{};
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
 
@@ -86,6 +87,7 @@ pub fn main() !void {
                 const target_reg_name = @tagName(instruction_args[0].register);
                 const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
                 const initial_val = target_reg.*;
+                const initial_flags = flags;
 
                 switch (instruction_args[1]) {
                     .immediate => {
@@ -94,23 +96,23 @@ pub fn main() !void {
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                                flags.sign = true;
                             } else {
-                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                                flags.sign = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
                             const comparison = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             if ((comparison & 0b1000_0000_0000_0000) != 0) {
-                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                                flags.sign = true;
                             } else {
-                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                                flags.sign = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                                flags.sign = true;
                             } else {
-                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                                flags.sign = false;
                             }
                         }
                     },
@@ -121,23 +123,23 @@ pub fn main() !void {
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% source_reg.*;
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                try stdout.print("Flags S {b}", .{target_reg.*});
+                                flags.sign = true;
                             } else {
-                                try stdout.print("Flags no S {b}", .{target_reg.*});
+                                flags.sign = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
                             const comparison = target_reg.* -% source_reg.*;
                             if ((comparison & 0b1000_0000_0000_0000) != 0) {
-                                try stdout.print("Flags: S {b}", .{target_reg.*});
+                                flags.sign = true;
                             } else {
-                                try stdout.print("Flags: no S {b}", .{target_reg.*});
+                                flags.sign = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% source_reg.*;
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                try stdout.print("Flags S {b}", .{target_reg.*});
+                                flags.sign = true;
                             } else {
-                                try stdout.print("Flags no S {b}", .{target_reg.*});
+                                flags.sign = false;
                             }
                         }
                     },
@@ -148,6 +150,11 @@ pub fn main() !void {
                     initial_val,
                     target_reg.*,
                 });
+                if (!std.meta.eql(initial_flags, flags)) {
+                    const initial_str = if (initial_flags.sign) "S" else "";
+                    const new_str = if (flags.sign) "S" else "";
+                    try stdout.print(" flags:{s}->{s}", .{ initial_str, new_str });
+                }
             }
         }
 

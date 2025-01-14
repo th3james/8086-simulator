@@ -95,25 +95,16 @@ pub fn main() !void {
                             target_reg.* = @bitCast(instruction_args[1].immediate.value);
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.S = true;
-                            } else {
-                                flags.S = false;
-                            }
+                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
+                            flags.Z = target_reg.* == 0;
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
                             const comparison = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            if ((comparison & 0b1000_0000_0000_0000) != 0) {
-                                flags.S = true;
-                            } else {
-                                flags.S = false;
-                            }
-                        } else if (std.mem.eql(u8, opcode.name, "sub")) {
+                            flags.S = (comparison & 0b1000_0000_0000_0000) != 0;
+                            flags.Z = comparison == 0;
+                        } else if (std.mem.eql(u8, opcode.name, "cmp")) {} else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.S = true;
-                            } else {
-                                flags.S = false;
-                            }
+                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
+                            flags.Z = target_reg.* == 0;
                         }
                     },
                     .register => {
@@ -122,25 +113,16 @@ pub fn main() !void {
                             target_reg.* = source_reg.*;
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% source_reg.*;
-                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.S = true;
-                            } else {
-                                flags.S = false;
-                            }
+                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
+                            flags.Z = target_reg.* == 0;
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
                             const comparison = target_reg.* -% source_reg.*;
-                            if ((comparison & 0b1000_0000_0000_0000) != 0) {
-                                flags.S = true;
-                            } else {
-                                flags.S = false;
-                            }
+                            flags.S = (comparison & 0b1000_0000_0000_0000) != 0;
+                            flags.Z = comparison == 0;
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% source_reg.*;
-                            if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.S = true;
-                            } else {
-                                flags.S = false;
-                            }
+                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
+                            flags.Z = target_reg.* == 0;
                         }
                     },
                     else => {},
@@ -151,9 +133,46 @@ pub fn main() !void {
                     target_reg.*,
                 });
                 if (!std.meta.eql(initial_flags, flags)) {
-                    const initial_str = if (initial_flags.S) "S" else "";
-                    const new_str = if (flags.S) "S" else "";
-                    try stdout.print(" flags:{s}->{s}", .{ initial_str, new_str });
+                    // TODO horrific duplication, extract flag printing
+                    const flag_info = @typeInfo(reg.Flags);
+                    try stdout.print(" flags:", .{});
+                    switch (flag_info) {
+                        .Struct => |struct_info| {
+                            inline for (struct_info.fields) |field_info| {
+                                const flag_name = field_info.name;
+                                const flag_value = @field(initial_flags, flag_name);
+
+                                switch (@typeInfo(field_info.type)) {
+                                    .Bool => {
+                                        if (flag_value) {
+                                            try stdout.print("{s}", .{flag_name});
+                                        }
+                                    },
+                                    else => unreachable,
+                                }
+                            }
+                        },
+                        else => unreachable,
+                    }
+                    try stdout.print("->", .{});
+                    switch (flag_info) {
+                        .Struct => |struct_info| {
+                            inline for (struct_info.fields) |field_info| {
+                                const flag_name = field_info.name;
+                                const flag_value = @field(flags, flag_name);
+
+                                switch (@typeInfo(field_info.type)) {
+                                    .Bool => {
+                                        if (flag_value) {
+                                            try stdout.print("{s}", .{flag_name});
+                                        }
+                                    },
+                                    else => unreachable,
+                                }
+                            }
+                        },
+                        else => unreachable,
+                    }
                 }
             }
         }

@@ -21,6 +21,7 @@ pub const Registers = struct {
 
 pub const Flags = struct {
     S: bool = false,
+    Z: bool = false,
 };
 
 pub fn getWideReg(regs: *Registers, reg: decode.Register) *u16 {

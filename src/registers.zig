@@ -20,7 +20,7 @@ pub const Registers = struct {
 };
 
 pub const Flags = struct {
-    sign: bool = false,
+    S: bool = false,
 };
 
 pub fn getWideReg(regs: *Registers, reg: decode.Register) *u16 {

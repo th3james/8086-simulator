@@ -96,23 +96,23 @@ pub fn main() !void {
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.sign = true;
+                                flags.S = true;
                             } else {
-                                flags.sign = false;
+                                flags.S = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
                             const comparison = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             if ((comparison & 0b1000_0000_0000_0000) != 0) {
-                                flags.sign = true;
+                                flags.S = true;
                             } else {
-                                flags.sign = false;
+                                flags.S = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.sign = true;
+                                flags.S = true;
                             } else {
-                                flags.sign = false;
+                                flags.S = false;
                             }
                         }
                     },
@@ -123,23 +123,23 @@ pub fn main() !void {
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% source_reg.*;
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.sign = true;
+                                flags.S = true;
                             } else {
-                                flags.sign = false;
+                                flags.S = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
                             const comparison = target_reg.* -% source_reg.*;
                             if ((comparison & 0b1000_0000_0000_0000) != 0) {
-                                flags.sign = true;
+                                flags.S = true;
                             } else {
-                                flags.sign = false;
+                                flags.S = false;
                             }
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% source_reg.*;
                             if ((target_reg.* & 0b1000_0000_0000_0000) != 0) {
-                                flags.sign = true;
+                                flags.S = true;
                             } else {
-                                flags.sign = false;
+                                flags.S = false;
                             }
                         }
                     },
@@ -151,8 +151,8 @@ pub fn main() !void {
                     target_reg.*,
                 });
                 if (!std.meta.eql(initial_flags, flags)) {
-                    const initial_str = if (initial_flags.sign) "S" else "";
-                    const new_str = if (flags.sign) "S" else "";
+                    const initial_str = if (initial_flags.S) "S" else "";
+                    const new_str = if (flags.S) "S" else "";
                     try stdout.print(" flags:{s}->{s}", .{ initial_str, new_str });
                 }
             }
@@ -182,6 +182,27 @@ pub fn main() !void {
                         else => {
                             unreachable;
                         },
+                    }
+                }
+            },
+            else => unreachable,
+        }
+
+        const flag_info = @typeInfo(reg.Flags);
+        try stdout.print("   flags: ", .{});
+        switch (flag_info) {
+            .Struct => |struct_info| {
+                inline for (struct_info.fields) |field_info| {
+                    const flag_name = field_info.name;
+                    const flag_value = @field(flags, flag_name);
+
+                    switch (@typeInfo(field_info.type)) {
+                        .Bool => {
+                            if (flag_value) {
+                                try stdout.print("{s}", .{flag_name});
+                            }
+                        },
+                        else => unreachable,
                     }
                 }
             },

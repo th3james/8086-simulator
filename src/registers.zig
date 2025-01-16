@@ -17,6 +17,31 @@ pub const Registers = struct {
     si: u16 = 0,
     bh: u8 = 0,
     di: u16 = 0,
+
+    pub fn print(self: Registers, writer: anytype) !void {
+        const info = @typeInfo(Registers);
+
+        switch (info) {
+            .Struct => |struct_info| {
+                inline for (struct_info.fields) |field_info| {
+                    const reg_name = field_info.name;
+                    const reg_value = @field(self, reg_name);
+
+                    switch (@typeInfo(field_info.type)) {
+                        .Int => {
+                            if (reg_value != 0) {
+                                try writer.print("      {s}: 0x{x:0>4} ({d})\n", .{ reg_name, reg_value, reg_value });
+                            }
+                        },
+                        else => {
+                            unreachable;
+                        },
+                    }
+                }
+            },
+            else => unreachable,
+        }
+    }
 };
 
 pub const Flags = struct {

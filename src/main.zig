@@ -133,46 +133,10 @@ pub fn main() !void {
                     target_reg.*,
                 });
                 if (!std.meta.eql(initial_flags, flags)) {
-                    // TODO horrific duplication, extract flag printing
-                    const flag_info = @typeInfo(reg.Flags);
                     try stdout.print(" flags:", .{});
-                    switch (flag_info) {
-                        .Struct => |struct_info| {
-                            inline for (struct_info.fields) |field_info| {
-                                const flag_name = field_info.name;
-                                const flag_value = @field(initial_flags, flag_name);
-
-                                switch (@typeInfo(field_info.type)) {
-                                    .Bool => {
-                                        if (flag_value) {
-                                            try stdout.print("{s}", .{flag_name});
-                                        }
-                                    },
-                                    else => unreachable,
-                                }
-                            }
-                        },
-                        else => unreachable,
-                    }
+                    try initial_flags.print(stdout);
                     try stdout.print("->", .{});
-                    switch (flag_info) {
-                        .Struct => |struct_info| {
-                            inline for (struct_info.fields) |field_info| {
-                                const flag_name = field_info.name;
-                                const flag_value = @field(flags, flag_name);
-
-                                switch (@typeInfo(field_info.type)) {
-                                    .Bool => {
-                                        if (flag_value) {
-                                            try stdout.print("{s}", .{flag_name});
-                                        }
-                                    },
-                                    else => unreachable,
-                                }
-                            }
-                        },
-                        else => unreachable,
-                    }
+                    try flags.print(stdout);
                 }
             }
         }
@@ -207,26 +171,8 @@ pub fn main() !void {
             else => unreachable,
         }
 
-        const flag_info = @typeInfo(reg.Flags);
         try stdout.print("   flags: ", .{});
-        switch (flag_info) {
-            .Struct => |struct_info| {
-                inline for (struct_info.fields) |field_info| {
-                    const flag_name = field_info.name;
-                    const flag_value = @field(flags, flag_name);
-
-                    switch (@typeInfo(field_info.type)) {
-                        .Bool => {
-                            if (flag_value) {
-                                try stdout.print("{s}", .{flag_name});
-                            }
-                        },
-                        else => unreachable,
-                    }
-                }
-            },
-            else => unreachable,
-        }
+        try flags.print(stdout);
     }
     try bw.flush();
 }

@@ -22,6 +22,28 @@ pub const Registers = struct {
 pub const Flags = struct {
     S: bool = false,
     Z: bool = false,
+
+    pub fn print(self: Flags, writer: anytype) !void {
+        const flag_info = @typeInfo(Flags);
+        switch (flag_info) {
+            .Struct => |struct_info| {
+                inline for (struct_info.fields) |field_info| {
+                    const flag_name = field_info.name;
+                    const flag_value = @field(self, flag_name);
+
+                    switch (@typeInfo(field_info.type)) {
+                        .Bool => {
+                            if (flag_value) {
+                                try writer.writeAll(flag_name);
+                            }
+                        },
+                        else => unreachable,
+                    }
+                }
+            },
+            else => unreachable,
+        }
+    }
 };
 
 pub fn getWideReg(regs: *Registers, reg: decode.Register) *u16 {

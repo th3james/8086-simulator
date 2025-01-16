@@ -127,12 +127,20 @@ pub fn main() !void {
                     },
                     else => {},
                 }
-                try stdout.print(" ; {s}:0x{x}->0x{x}", .{
-                    target_reg_name,
-                    initial_val,
-                    target_reg.*,
-                });
+
+                var change = false;
+                if (initial_val != target_reg.*) {
+                    change = true;
+                    try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                        target_reg_name,
+                        initial_val,
+                        target_reg.*,
+                    });
+                }
                 if (!std.meta.eql(initial_flags, flags)) {
+                    if (!change) {
+                        try stdout.print(" ;", .{});
+                    }
                     try stdout.print(" flags:", .{});
                     try initial_flags.print(stdout);
                     try stdout.print("->", .{});

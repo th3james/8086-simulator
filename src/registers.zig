@@ -69,6 +69,11 @@ pub const Flags = struct {
             else => unreachable,
         }
     }
+
+    pub fn update(self: *Flags, result_value: u16) void {
+        self.S = (result_value & 0b1000_0000_0000_0000) != 0;
+        self.Z = result_value == 0;
+    }
 };
 
 pub fn getWideReg(regs: *Registers, reg: decode.Register) *u16 {

@@ -95,16 +95,14 @@ pub fn main() !void {
                             target_reg.* = @bitCast(instruction_args[1].immediate.value);
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
-                            flags.Z = target_reg.* == 0;
+                            flags.update(target_reg.*);
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
-                            const comparison = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            flags.S = (comparison & 0b1000_0000_0000_0000) != 0;
-                            flags.Z = comparison == 0;
+                            flags.update(
+                                target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value)),
+                            );
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {} else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
-                            flags.Z = target_reg.* == 0;
+                            flags.update(target_reg.*);
                         }
                     },
                     .register => {
@@ -113,16 +111,12 @@ pub fn main() !void {
                             target_reg.* = source_reg.*;
                         } else if (std.mem.eql(u8, opcode.name, "add")) {
                             target_reg.* = target_reg.* +% source_reg.*;
-                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
-                            flags.Z = target_reg.* == 0;
+                            flags.update(target_reg.*);
                         } else if (std.mem.eql(u8, opcode.name, "cmp")) {
-                            const comparison = target_reg.* -% source_reg.*;
-                            flags.S = (comparison & 0b1000_0000_0000_0000) != 0;
-                            flags.Z = comparison == 0;
+                            flags.update(target_reg.* -% source_reg.*);
                         } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% source_reg.*;
-                            flags.S = (target_reg.* & 0b1000_0000_0000_0000) != 0;
-                            flags.Z = target_reg.* == 0;
+                            flags.update(target_reg.*);
                         }
                     },
                     else => {},

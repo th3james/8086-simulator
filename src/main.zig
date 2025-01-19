@@ -62,7 +62,7 @@ pub fn main() !void {
         const instruction_bytes = if (instruction_end <= program_len)
             memory.sliceMemory(emu_mem, memory_address, instruction_end)
         else
-            // TODO handle this error
+            std.debug.print("Error: Instruction extends beyond end of program\n", .{});
             return InvalidBinaryErrors.IncompleteInstruction;
         memory_address = instruction_end;
 

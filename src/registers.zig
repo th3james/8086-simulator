@@ -1,3 +1,4 @@
+const std = @import("std");
 const decode = @import("decode/register_names.zig");
 
 pub const Registers = struct {
@@ -45,6 +46,7 @@ pub const Registers = struct {
 };
 
 pub const Flags = struct {
+    P: bool = false,
     S: bool = false,
     Z: bool = false,
 
@@ -73,6 +75,55 @@ pub const Flags = struct {
     pub fn update(self: *Flags, result_value: u16) void {
         self.S = (result_value & 0b1000_0000_0000_0000) != 0;
         self.Z = result_value == 0;
+
+        // Only the least signficant byte is checked for parity
+        var ones: u4 = 0;
+        var val: u8 = @truncate(result_value);
+        while (val != 0) : (val &= val - 1) {
+            ones += 1;
+        }
+        // Parity flag is set if number of 1s is even
+        self.P = (ones & 1) == 0;
+    }
+
+    test "S flag is set when result is negative" {
+        var flags = Flags{};
+
+        // Test positive number (MSB = 0)
+        flags.update(0x7FFF);
+        try std.testing.expect(!flags.S);
+
+        // Test negative number (MSB = 1)
+        flags.update(0x8000);
+        try std.testing.expect(flags.S);
+
+        // Test another positive number
+        flags.update(0x0001);
+        try std.testing.expect(!flags.S);
+
+        // Test another negative number
+        flags.update(0xFFFF);
+        try std.testing.expect(flags.S);
+    }
+
+    test "Z flag is set when result is zero" {
+        var flags = Flags{};
+
+        // Test positive number (MSB = 0)
+        flags.update(0x000F);
+        try std.testing.expect(!flags.Z);
+
+        // Test negative number (MSB = 1)
+        flags.update(0x8000);
+        try std.testing.expect(flags.S);
+
+        // Test another positive number
+        flags.update(0x0001);
+        try std.testing.expect(!flags.S);
+
+        // Test another negative number
+        flags.update(0xFFFF);
+        try std.testing.expect(flags.S);
     }
 };
 

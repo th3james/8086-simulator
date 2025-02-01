@@ -27,7 +27,7 @@ pub fn main() !void {
     // Init system
     var registers = reg.Registers{};
     var flags = reg.Flags{};
-    var instruction_pointer: u32 = 0;
+    var instruction_pointer: u16 = 0;
 
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
@@ -50,6 +50,8 @@ pub fn main() !void {
     while (instruction_pointer < program_len) {
         _ = arena.reset(.retain_capacity);
         const arena_allocator = arena.allocator();
+
+        const initial_ip = instruction_pointer;
 
         // Decode
         const opcode = try decodeOpcodeAtAddress(emu_mem, instruction_pointer, program_len);
@@ -119,6 +121,11 @@ pub fn main() !void {
                             flags.update(target_reg.*);
                         }
                     },
+                    .none => {
+                        if (std.mem.eql(u8, opcode.name, "jmp")) {
+                            instruction_pointer = @bitCast(instruction_args[1].immediate.value);
+                        }
+                    },
                     else => {},
                 }
 
@@ -131,6 +138,7 @@ pub fn main() !void {
                         target_reg.*,
                     });
                 }
+                try stdout.print(" ip:0x{x}->0x{x}\n", .{ initial_ip, instruction_pointer });
                 if (!std.meta.eql(initial_flags, flags)) {
                     if (!change) {
                         try stdout.print(" ;", .{});

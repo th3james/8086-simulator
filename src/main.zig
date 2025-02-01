@@ -138,7 +138,7 @@ pub fn main() !void {
                         target_reg.*,
                     });
                 }
-                try stdout.print(" ip:0x{x}->0x{x}\n", .{ initial_ip, instruction_pointer });
+                try stdout.print(" ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
                 if (!std.meta.eql(initial_flags, flags)) {
                     if (!change) {
                         try stdout.print(" ;", .{});
@@ -157,6 +157,7 @@ pub fn main() !void {
     if (parsed_args.execute) {
         try stdout.print("Final registers:\n", .{});
         try registers.print(stdout);
+        try stdout.print("      ip: 0x{x:0>4} ({d})\n", .{ instruction_pointer, instruction_pointer });
         try stdout.print("   flags: ", .{});
         try flags.print(stdout);
     }

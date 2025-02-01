@@ -27,6 +27,8 @@ pub fn main() !void {
     // Init system
     var registers = reg.Registers{};
     var flags = reg.Flags{};
+    var instruction_pointer: u32 = 0;
+
     const emu_mem = try allocator.create(memory.Memory);
     defer _ = allocator.destroy(emu_mem);
 
@@ -45,25 +47,24 @@ pub fn main() !void {
     defer arena.deinit();
 
     // Main loop through memory
-    var memory_address: u32 = 0;
-    while (memory_address < program_len) {
+    while (instruction_pointer < program_len) {
         _ = arena.reset(.retain_capacity);
         const arena_allocator = arena.allocator();
 
         // Decode
-        const opcode = try decodeOpcodeAtAddress(emu_mem, memory_address, program_len);
+        const opcode = try decodeOpcodeAtAddress(emu_mem, instruction_pointer, program_len);
 
         const layout = instruction_layout.getInstructionLayout(opcode);
 
-        const instruction_end = memory_address + instruction_layout.getInstructionLength(opcode.length, layout);
-        assert(instruction_end > memory_address);
-        assert((instruction_end - memory_address) <= instruction_layout.MAX_INSTRUCTION_LENGTH);
+        const instruction_end = instruction_pointer + instruction_layout.getInstructionLength(opcode.length, layout);
+        assert(instruction_end > instruction_pointer);
+        assert((instruction_end - instruction_pointer) <= instruction_layout.MAX_INSTRUCTION_LENGTH);
 
         const instruction_bytes = if (instruction_end <= program_len)
-            memory.sliceMemory(emu_mem, memory_address, instruction_end)
+            memory.sliceMemory(emu_mem, instruction_pointer, instruction_end)
         else
             return InvalidBinaryErrors.IncompleteInstruction;
-        memory_address = instruction_end;
+        instruction_pointer = instruction_end;
 
         const current_instruction = instruction.Instruction{
             .bytes = instruction_bytes,
@@ -99,7 +100,7 @@ pub fn main() !void {
                             flags.update(
                                 target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value)),
                             );
-                        } else if (std.mem.eql(u8, opcode.name, "cmp")) {} else if (std.mem.eql(u8, opcode.name, "sub")) {
+                        } else if (std.mem.eql(u8, opcode.name, "sub")) {
                             target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
                             flags.update(target_reg.*);
                         }

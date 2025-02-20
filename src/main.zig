@@ -129,10 +129,9 @@ pub fn main() !void {
                     else => {},
                 }
 
-                var change = false;
+                try stdout.print(" ;", .{});
                 if (initial_val != target_reg.*) {
-                    change = true;
-                    try stdout.print(" ; {s}:0x{x}->0x{x}", .{
+                    try stdout.print(" {s}:0x{x}->0x{x}", .{
                         target_reg_name,
                         initial_val,
                         target_reg.*,
@@ -140,9 +139,6 @@ pub fn main() !void {
                 }
                 try stdout.print(" ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
                 if (!std.meta.eql(initial_flags, flags)) {
-                    if (!change) {
-                        try stdout.print(" ;", .{});
-                    }
                     try stdout.print(" flags:", .{});
                     try initial_flags.print(stdout);
                     try stdout.print("->", .{});

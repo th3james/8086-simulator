@@ -156,6 +156,7 @@ pub fn main() !void {
                                 ));
                             }
                         }
+                        try stdout.print(" ; ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
                     }
                 },
                 else => {

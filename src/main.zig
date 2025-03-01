@@ -85,65 +85,82 @@ pub fn main() !void {
 
         // Execute
         if (parsed_args.execute) {
-            if (instruction_args[0] == .register) {
-                const target_reg_name = @tagName(instruction_args[0].register);
-                const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
-                const initial_val = target_reg.*;
-                const initial_flags = flags;
+            switch (instruction_args[0]) {
+                .register => {
+                    const target_reg_name = @tagName(instruction_args[0].register);
+                    const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
+                    const initial_val = target_reg.*;
+                    const initial_flags = flags;
 
-                switch (instruction_args[1]) {
-                    .immediate => {
-                        if (std.mem.eql(u8, opcode.name, "mov")) {
-                            target_reg.* = @bitCast(instruction_args[1].immediate.value);
-                        } else if (std.mem.eql(u8, opcode.name, "add")) {
-                            target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            flags.update(target_reg.*);
-                        } else if (std.mem.eql(u8, opcode.name, "cmp")) {
-                            flags.update(
-                                target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value)),
-                            );
-                        } else if (std.mem.eql(u8, opcode.name, "sub")) {
-                            target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
-                            flags.update(target_reg.*);
-                        }
-                    },
-                    .register => {
-                        const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
-                        if (std.mem.eql(u8, opcode.name, "mov")) {
-                            target_reg.* = source_reg.*;
-                        } else if (std.mem.eql(u8, opcode.name, "add")) {
-                            target_reg.* = target_reg.* +% source_reg.*;
-                            flags.update(target_reg.*);
-                        } else if (std.mem.eql(u8, opcode.name, "cmp")) {
-                            flags.update(target_reg.* -% source_reg.*);
-                        } else if (std.mem.eql(u8, opcode.name, "sub")) {
-                            target_reg.* = target_reg.* -% source_reg.*;
-                            flags.update(target_reg.*);
-                        }
-                    },
-                    .none => {
-                        if (std.mem.eql(u8, opcode.name, "jmp")) {
-                            instruction_pointer = @bitCast(instruction_args[1].immediate.value);
-                        }
-                    },
-                    else => {},
-                }
+                    switch (instruction_args[1]) {
+                        .immediate => {
+                            if (std.mem.eql(u8, opcode.name, "mov")) {
+                                target_reg.* = @bitCast(instruction_args[1].immediate.value);
+                            } else if (std.mem.eql(u8, opcode.name, "add")) {
+                                target_reg.* = target_reg.* +% @as(u16, @bitCast(instruction_args[1].immediate.value));
+                                flags.update(target_reg.*);
+                            } else if (std.mem.eql(u8, opcode.name, "cmp")) {
+                                flags.update(
+                                    target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value)),
+                                );
+                            } else if (std.mem.eql(u8, opcode.name, "sub")) {
+                                target_reg.* = target_reg.* -% @as(u16, @bitCast(instruction_args[1].immediate.value));
+                                flags.update(target_reg.*);
+                            }
+                        },
+                        .register => {
+                            const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
+                            if (std.mem.eql(u8, opcode.name, "mov")) {
+                                target_reg.* = source_reg.*;
+                            } else if (std.mem.eql(u8, opcode.name, "add")) {
+                                target_reg.* = target_reg.* +% source_reg.*;
+                                flags.update(target_reg.*);
+                            } else if (std.mem.eql(u8, opcode.name, "cmp")) {
+                                flags.update(target_reg.* -% source_reg.*);
+                            } else if (std.mem.eql(u8, opcode.name, "sub")) {
+                                target_reg.* = target_reg.* -% source_reg.*;
+                                flags.update(target_reg.*);
+                            }
+                        },
+                        else => {
+                            std.debug.print("unhandled second instruction argument: {s}", .{@tagName(instruction_args[1])});
+                        },
+                    }
 
-                try stdout.print(" ;", .{});
-                if (initial_val != target_reg.*) {
-                    try stdout.print(" {s}:0x{x}->0x{x}", .{
-                        target_reg_name,
-                        initial_val,
-                        target_reg.*,
-                    });
-                }
-                try stdout.print(" ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
-                if (!std.meta.eql(initial_flags, flags)) {
-                    try stdout.print(" flags:", .{});
-                    try initial_flags.print(stdout);
-                    try stdout.print("->", .{});
-                    try flags.print(stdout);
-                }
+                    try stdout.print(" ;", .{});
+                    if (initial_val != target_reg.*) {
+                        try stdout.print(" {s}:0x{x}->0x{x}", .{
+                            target_reg_name,
+                            initial_val,
+                            target_reg.*,
+                        });
+                    }
+                    try stdout.print(" ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
+                    if (!std.meta.eql(initial_flags, flags)) {
+                        try stdout.print(" flags:", .{});
+                        try initial_flags.print(stdout);
+                        try stdout.print("->", .{});
+                        try flags.print(stdout);
+                    }
+                },
+                .relative_address => {
+                    if (std.mem.eql(u8, opcode.name, "jnz")) {
+                        if (!flags.Z) {
+                            if (instruction_args[0].relative_address < 0 and
+                                @as(u16, @intCast(-instruction_args[0].relative_address)) > instruction_pointer)
+                            {
+                                @panic("Negative jump exceeded bounds");
+                            } else {
+                                instruction_pointer = @as(u16, @intCast(
+                                    @as(i32, @intCast(instruction_pointer)) + instruction_args[0].relative_address,
+                                ));
+                            }
+                        }
+                    }
+                },
+                else => {
+                    std.debug.print("unhandled instruction argument: {s}", .{@tagName(instruction_args[0])});
+                },
             }
         }
 

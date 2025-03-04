@@ -238,6 +238,22 @@ test "instructionToString - absolute address arguments" {
     try std.testing.expectEqualStrings("mov al, [257]", result);
 }
 
+test "instructionToString - immediate word to absolute address" {
+    const allocator = std.testing.allocator;
+    const args = [_]decode_arguments.Operand{
+        .{ .absolute_address = 257 },
+        .{ .immediate = .{ .value = 7, .size = .word } },
+    };
+    const result = try instructionToString(
+        std.testing.allocator,
+        "mov",
+        args,
+    );
+    defer allocator.free(result);
+
+    try std.testing.expectEqualStrings("mov word [257], 7", result);
+}
+
 test "instructionToString - jmp with negative relative address argument" {
     const allocator = std.testing.allocator;
     const args = [_]decode_arguments.Operand{

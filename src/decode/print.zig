@@ -238,6 +238,22 @@ test "instructionToString - absolute address arguments" {
     try std.testing.expectEqualStrings("mov al, [257]", result);
 }
 
+test "instructionToString - absolute address to byte register" {
+    const allocator = std.testing.allocator;
+    const args = [_]decode_arguments.Operand{
+        .{ .register = registers.Register.bl },
+        .{ .absolute_address = 1337 },
+    };
+    const result = try instructionToString(
+        std.testing.allocator,
+        "mov",
+        args,
+    );
+    defer allocator.free(result);
+
+    try std.testing.expectEqualStrings("mov bl, byte [1337]", result);
+}
+
 test "instructionToString - immediate word to absolute address" {
     const allocator = std.testing.allocator;
     const args = [_]decode_arguments.Operand{

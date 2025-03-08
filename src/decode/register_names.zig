@@ -29,6 +29,26 @@ test "getRegister gets register" {
     try std.testing.expectEqual(Register.cx, getRegister(0b001, true));
 }
 
+pub fn isWide(reg: Register) bool {
+    assert(reg != .none);
+    for (registerMap) |pair| {
+        if (pair.wide == reg) {
+            return true;
+        } else if (pair.narrow == reg) {
+            return false;
+        }
+    }
+    unreachable;
+}
+
+test "isWide for wide returns true" {
+    try std.testing.expect(isWide(Register.ax));
+}
+
+test "isWide for narrow returns false" {
+    try std.testing.expect(!isWide(Register.al));
+}
+
 const effectiveAddressRegisterMap = [_][2]Register{
     .{ Register.bx, Register.si },
     .{ Register.bx, Register.di },

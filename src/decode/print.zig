@@ -53,11 +53,7 @@ fn operandToString(writer: anytype, argument: decode_arguments.Operand) !void {
             try writer.writeAll("]");
         },
         .immediate => |imm| {
-            if (imm.size == .registerDefined) {
-                try writer.print("{d}", .{imm.value});
-            } else {
-                try writer.print("{s} {d}", .{ @tagName(imm.size), imm.value });
-            }
+            try writer.print("{d}", .{imm.value});
         },
         else => {
             try writer.writeAll("welp");
@@ -167,7 +163,7 @@ test "operandToString - byte immediate" {
         decode_arguments.Operand{ .immediate = .{ .value = 7, .size = .byte } },
     );
 
-    try std.testing.expectEqualStrings("byte 7", result_buffer.items);
+    try std.testing.expectEqualStrings("7", result_buffer.items);
 }
 
 test "operandToString - word immediate" {
@@ -179,7 +175,7 @@ test "operandToString - word immediate" {
         decode_arguments.Operand{ .immediate = .{ .value = 7, .size = .word } },
     );
 
-    try std.testing.expectEqualStrings("word 7", result_buffer.items);
+    try std.testing.expectEqualStrings("7", result_buffer.items);
 }
 
 // cp ax, bx
@@ -197,9 +193,46 @@ pub fn instructionToString(
     try writer.writeAll(mnemonic);
     try writer.writeAll(" ");
 
+    switch (args[0]) {
+        .absolute_address, .effective_address => {
+            switch (args[1]) {
+                .immediate => {
+                    try writer.print("{s} ", .{@tagName(args[1].immediate.size)});
+                },
+                .register => {
+                    if (registers.isWide(args[1].register)) {
+                        try writer.print("word ", .{});
+                    } else {
+                        try writer.print("byte ", .{});
+                    }
+                },
+                else => {},
+            }
+        },
+        else => {},
+    }
+
     try operandToString(writer, args[0]);
     if (args[1] != .none) {
         try writer.writeAll(", ");
+        switch (args[1]) {
+            .absolute_address, .effective_address => {
+                switch (args[0]) {
+                    .immediate => {
+                        try writer.print("{s} ", .{@tagName(args[0].immediate.size)});
+                    },
+                    .register => {
+                        if (registers.isWide(args[0].register)) {
+                            try writer.print("word ", .{});
+                        } else {
+                            try writer.print("byte ", .{});
+                        }
+                    },
+                    else => {},
+                }
+            },
+            else => {},
+        }
         try operandToString(writer, args[1]);
     }
 
@@ -235,23 +268,7 @@ test "instructionToString - absolute address arguments" {
     );
     defer allocator.free(result);
 
-    try std.testing.expectEqualStrings("mov al, [257]", result);
-}
-
-test "instructionToString - absolute address to byte register" {
-    const allocator = std.testing.allocator;
-    const args = [_]decode_arguments.Operand{
-        .{ .register = registers.Register.bl },
-        .{ .absolute_address = 1337 },
-    };
-    const result = try instructionToString(
-        std.testing.allocator,
-        "mov",
-        args,
-    );
-    defer allocator.free(result);
-
-    try std.testing.expectEqualStrings("mov bl, byte [1337]", result);
+    try std.testing.expectEqualStrings("mov al, byte [257]", result);
 }
 
 test "instructionToString - immediate word to absolute address" {
@@ -268,6 +285,22 @@ test "instructionToString - immediate word to absolute address" {
     defer allocator.free(result);
 
     try std.testing.expectEqualStrings("mov word [257], 7", result);
+}
+
+test "instructionToString - absolute address to byte register" {
+    const allocator = std.testing.allocator;
+    const args = [_]decode_arguments.Operand{
+        .{ .register = registers.Register.bl },
+        .{ .absolute_address = 1337 },
+    };
+    const result = try instructionToString(
+        std.testing.allocator,
+        "mov",
+        args,
+    );
+    defer allocator.free(result);
+
+    try std.testing.expectEqualStrings("mov bl, byte [1337]", result);
 }
 
 test "instructionToString - jmp with negative relative address argument" {

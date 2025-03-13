@@ -81,8 +81,8 @@ cmp [bp], bx
 cmp [bx + 2], cx
 cmp [bp + si + 4], bh
 cmp [bp + di + 6], di
-cmp [bx], byte 34
-cmp [4834], word 29
+cmp byte [bx], 34
+cmp word [4834], 29
 cmp ax, [bp]
 cmp al, [bx + si]
 cmp ax, bx

@@ -194,17 +194,10 @@ pub fn instructionToString(
     try writer.writeAll(" ");
 
     switch (args[0]) {
-        .absolute_address, .effective_address => {
+        .effective_address, .absolute_address => {
             switch (args[1]) {
                 .immediate => {
                     try writer.print("{s} ", .{@tagName(args[1].immediate.size)});
-                },
-                .register => {
-                    if (registers.isWide(args[1].register)) {
-                        try writer.print("word ", .{});
-                    } else {
-                        try writer.print("byte ", .{});
-                    }
                 },
                 else => {},
             }
@@ -219,14 +212,7 @@ pub fn instructionToString(
             .absolute_address, .effective_address => {
                 switch (args[0]) {
                     .immediate => {
-                        try writer.print("{s} ", .{@tagName(args[0].immediate.size)});
-                    },
-                    .register => {
-                        if (registers.isWide(args[0].register)) {
-                            try writer.print("word ", .{});
-                        } else {
-                            try writer.print("byte ", .{});
-                        }
+                        try writer.print("{s} ", .{@tagName(args[1].immediate.size)});
                     },
                     else => {},
                 }

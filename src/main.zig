@@ -85,12 +85,12 @@ pub fn main() !void {
 
         // Execute
         if (parsed_args.execute) {
+            const initial_registers = registers;
+            const initial_flags = flags;
+
             switch (instruction_args[0]) {
                 .register => {
-                    const target_reg_name = @tagName(instruction_args[0].register);
                     const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
-                    const initial_val = target_reg.*;
-                    const initial_flags = flags;
 
                     switch (instruction_args[1]) {
                         .immediate => {
@@ -126,22 +126,6 @@ pub fn main() !void {
                             std.debug.print("unhandled second instruction argument: {s}", .{@tagName(instruction_args[1])});
                         },
                     }
-
-                    try stdout.print(" ;", .{});
-                    if (initial_val != target_reg.*) {
-                        try stdout.print(" {s}:0x{x}->0x{x}", .{
-                            target_reg_name,
-                            initial_val,
-                            target_reg.*,
-                        });
-                    }
-                    try stdout.print(" ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
-                    if (!std.meta.eql(initial_flags, flags)) {
-                        try stdout.print(" flags:", .{});
-                        try initial_flags.print(stdout);
-                        try stdout.print("->", .{});
-                        try flags.print(stdout);
-                    }
                 },
                 .relative_address => {
                     if (std.mem.eql(u8, opcode.name, "jnz")) {
@@ -156,12 +140,20 @@ pub fn main() !void {
                                 ));
                             }
                         }
-                        try stdout.print(" ; ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
                     }
                 },
                 else => {
                     std.debug.print("unhandled instruction argument: {s}", .{@tagName(instruction_args[0])});
                 },
+            }
+            try stdout.print(" ; ", .{});
+            try registers.print_changes(initial_registers, stdout);
+            try stdout.print("ip:0x{x}->0x{x}", .{ initial_ip, instruction_pointer });
+            if (!std.meta.eql(initial_flags, flags)) {
+                try stdout.print(" flags:", .{});
+                try initial_flags.print(stdout);
+                try stdout.print("->", .{});
+                try flags.print(stdout);
             }
         }
 

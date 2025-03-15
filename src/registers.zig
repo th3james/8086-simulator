@@ -34,9 +34,31 @@ pub const Registers = struct {
                                 try writer.print("      {s}: 0x{x:0>4} ({d})\n", .{ reg_name, reg_value, reg_value });
                             }
                         },
-                        else => {
-                            unreachable;
+                        else => unreachable,
+                    }
+                }
+            },
+            else => unreachable,
+        }
+    }
+
+    pub fn print_changes(self: Registers, previous: Registers, writer: anytype) !void {
+        const info = @typeInfo(Registers);
+
+        switch (info) {
+            .Struct => |struct_info| {
+                inline for (struct_info.fields) |field_info| {
+                    const reg_name = field_info.name;
+                    const old_value = @field(previous, reg_name);
+                    const new_value = @field(self, reg_name);
+
+                    switch (@typeInfo(field_info.type)) {
+                        .Int => {
+                            if (old_value != new_value) {
+                                try writer.print("{s}:0x{x}->0x{x} ", .{ reg_name, old_value, new_value });
+                            }
                         },
+                        else => unreachable,
                     }
                 }
             },

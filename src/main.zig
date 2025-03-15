@@ -123,7 +123,7 @@ pub fn main() !void {
                             }
                         },
                         else => {
-                            std.debug.print("unhandled second instruction argument: {s}", .{@tagName(instruction_args[1])});
+                            std.debug.print("unhandled second instruction argument: {s}\n", .{@tagName(instruction_args[1])});
                         },
                     }
                 },
@@ -140,10 +140,26 @@ pub fn main() !void {
                                 ));
                             }
                         }
+                    } else {
+                        std.debug.print("unhandled mnemonic for relative address: {s}\n", .{opcode.name});
+                    }
+                },
+                .absolute_address => {
+                    switch (instruction_args[1]) {
+                        .immediate => {
+                            if (std.mem.eql(u8, opcode.name, "mov")) {
+                                std.debug.print("TODO\n", .{});
+                            } else {
+                                std.debug.print("unhandled mnemonic for absolute_address, immediate: {s}\n", .{opcode.name});
+                            }
+                        },
+                        else => {
+                            std.debug.print("unhandled second operand for absolute_address: {}\n", .{instruction_args[1]});
+                        },
                     }
                 },
                 else => {
-                    std.debug.print("unhandled instruction argument: {s}", .{@tagName(instruction_args[0])});
+                    std.debug.print("unhandled instruction argument: {s}\n", .{@tagName(instruction_args[0])});
                 },
             }
             try stdout.print(" ; ", .{});

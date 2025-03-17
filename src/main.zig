@@ -148,7 +148,23 @@ pub fn main() !void {
                     switch (instruction_args[1]) {
                         .immediate => {
                             if (std.mem.eql(u8, opcode.name, "mov")) {
-                                std.debug.print("TODO\n", .{});
+                                switch (instruction_args[1].immediate.size) {
+                                    .byte => {
+                                        emu_mem.bytes[instruction_args[0].absolute_address] = @intCast(
+                                            instruction_args[1].immediate.value,
+                                        );
+                                    },
+                                    .word => {
+                                        std.mem.writePackedInt(
+                                            i16,
+                                            &emu_mem.bytes,
+                                            instruction_args[0].absolute_address,
+                                            instruction_args[1].immediate.value,
+                                            .little,
+                                        );
+                                    },
+                                    .registerDefined => unreachable,
+                                }
                             } else {
                                 std.debug.print("unhandled mnemonic for absolute_address, immediate: {s}\n", .{opcode.name});
                             }

@@ -177,13 +177,31 @@ pub fn main() !void {
                     }
                 },
                 .effective_address => {
+                    const target_address = registers.calculateEffectiveAddress(
+                        instruction_args[0].effective_address,
+                    );
                     switch (instruction_args[1]) {
                         .immediate => {
+                            const immediate = instruction_args[1].immediate;
                             if (std.mem.eql(u8, opcode.name, "mov")) {
-                                std.debug.print(
-                                    "TODO - compute effective address\n",
-                                    .{},
-                                );
+                                // TODO Duplication with absolute address
+                                switch (immediate.size) {
+                                    .byte => {
+                                        emu_mem.bytes[target_address] = @intCast(
+                                            immediate.value,
+                                        );
+                                    },
+                                    .word => {
+                                        std.mem.writePackedInt(
+                                            i16,
+                                            &emu_mem.bytes,
+                                            target_address,
+                                            immediate.value,
+                                            .little,
+                                        );
+                                    },
+                                    .registerDefined => unreachable,
+                                }
                             } else {
                                 std.debug.print("unhandled mnemonic for effective_address, immediate: {s}\n", .{opcode.name});
                             }

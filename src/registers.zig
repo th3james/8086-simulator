@@ -42,6 +42,7 @@ pub const Registers = struct {
         }
     }
 
+    // TODO wrong case for name - printChanges
     pub fn print_changes(self: Registers, previous: Registers, writer: anytype) !void {
         const info = @typeInfo(Registers);
 
@@ -64,6 +65,14 @@ pub const Registers = struct {
             },
             else => unreachable,
         }
+    }
+
+    pub fn calculateEffectiveAddress(self: *Registers, effective_address: decode.EffectiveAddress) u16 {
+        var result = getWideReg(self, effective_address.r1).*;
+        if (effective_address.r1 != .none) {
+            result += getWideReg(self, effective_address.r1).*;
+        }
+        return result + effective_address.displacement;
     }
 };
 

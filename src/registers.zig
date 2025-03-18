@@ -67,10 +67,10 @@ pub const Registers = struct {
         }
     }
 
-    pub fn calculateEffectiveAddress(self: *Registers, effective_address: decode.EffectiveAddress) u16 {
-        var result = getWideReg(self, effective_address.r1).*;
+    pub fn calculateEffectiveAddress(self: *const Registers, effective_address: decode.EffectiveAddress) u16 {
+        var result = getRegVal(self, effective_address.r1);
         if (effective_address.r1 != .none) {
-            result += getWideReg(self, effective_address.r2).*;
+            result += getRegVal(self, effective_address.r2);
         }
         return if (effective_address.displacement < 0) blk: {
             const abs_displacement = @abs(effective_address.displacement);
@@ -87,7 +87,7 @@ pub const Registers = struct {
 };
 
 test "calculateEffectiveAddress with BX+SI and positive displacement" {
-    var regs = Registers{
+    const regs = Registers{
         .bx = 0x1000,
         .si = 0x0100,
     };
@@ -197,5 +197,27 @@ pub fn getWideReg(regs: *Registers, reg: decode.Register) *u16 {
         .si => &regs.si,
         .di => &regs.di,
         else => unreachable,
+    };
+}
+
+pub fn getRegVal(regs: *const Registers, reg: decode.Register) u16 {
+    return switch (reg) {
+        .ax => regs.ax,
+        .cx => regs.cx,
+        .dx => regs.dx,
+        .bx => regs.bx,
+        .sp => regs.sp,
+        .bp => regs.bp,
+        .si => regs.si,
+        .di => regs.di,
+        .al => regs.al,
+        .cl => regs.cl,
+        .dl => regs.dl,
+        .bl => regs.bl,
+        .ah => regs.ah,
+        .ch => regs.ch,
+        .dh => regs.dh,
+        .bh => regs.bh,
+        .none => 0,
     };
 }

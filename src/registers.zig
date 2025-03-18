@@ -70,11 +70,39 @@ pub const Registers = struct {
     pub fn calculateEffectiveAddress(self: *Registers, effective_address: decode.EffectiveAddress) u16 {
         var result = getWideReg(self, effective_address.r1).*;
         if (effective_address.r1 != .none) {
-            result += getWideReg(self, effective_address.r1).*;
+            result += getWideReg(self, effective_address.r2).*;
         }
-        return result + effective_address.displacement;
+        return if (effective_address.displacement < 0) blk: {
+            const abs_displacement = @abs(effective_address.displacement);
+            std.debug.assert(abs_displacement < result);
+            break :blk result - abs_displacement;
+        } else blk: {
+            break :blk std.math.add(
+                u16,
+                result,
+                @intCast(effective_address.displacement),
+            ) catch unreachable;
+        };
     }
 };
+
+test "calculateEffectiveAddress with BX+SI and positive displacement" {
+    var regs = Registers{
+        .bx = 0x1000,
+        .si = 0x0100,
+    };
+
+    const effective_address = decode.EffectiveAddress{
+        .r1 = decode.Register.bx,
+        .r2 = decode.Register.si,
+        .displacement = 0x0010,
+    };
+
+    try std.testing.expectEqual(
+        @as(u16, 0x1110),
+        regs.calculateEffectiveAddress(effective_address),
+    );
+}
 
 pub const Flags = struct {
     P: bool = false,

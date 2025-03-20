@@ -23,13 +23,13 @@ pub const Registers = struct {
         const info = @typeInfo(Registers);
 
         switch (info) {
-            .Struct => |struct_info| {
+            .@"struct" => |struct_info| {
                 inline for (struct_info.fields) |field_info| {
                     const reg_name = field_info.name;
                     const reg_value = @field(self, reg_name);
 
                     switch (@typeInfo(field_info.type)) {
-                        .Int => {
+                        .int => {
                             if (reg_value != 0) {
                                 try writer.print("      {s}: 0x{x:0>4} ({d})\n", .{ reg_name, reg_value, reg_value });
                             }
@@ -47,14 +47,14 @@ pub const Registers = struct {
         const info = @typeInfo(Registers);
 
         switch (info) {
-            .Struct => |struct_info| {
+            .@"struct" => |struct_info| {
                 inline for (struct_info.fields) |field_info| {
                     const reg_name = field_info.name;
                     const old_value = @field(previous, reg_name);
                     const new_value = @field(self, reg_name);
 
                     switch (@typeInfo(field_info.type)) {
-                        .Int => {
+                        .int => {
                             if (old_value != new_value) {
                                 try writer.print("{s}:0x{x}->0x{x} ", .{ reg_name, old_value, new_value });
                             }
@@ -112,13 +112,13 @@ pub const Flags = struct {
     pub fn print(self: Flags, writer: anytype) !void {
         const flag_info = @typeInfo(Flags);
         switch (flag_info) {
-            .Struct => |struct_info| {
+            .@"struct" => |struct_info| {
                 inline for (struct_info.fields) |field_info| {
                     const flag_name = field_info.name;
                     const flag_value = @field(self, flag_name);
 
                     switch (@typeInfo(field_info.type)) {
-                        .Bool => {
+                        .bool => {
                             if (flag_value) {
                                 try writer.writeAll(flag_name);
                             }

@@ -161,7 +161,7 @@ pub fn decodeArguments(inst: instruction.Instruction) ![2]Operand {
         .subImmediateToAccumulator,
         .cmpImmediateWithAccumulator,
         => {
-            const immediate_operand = .{
+            const immediate_operand = Operand{
                 .immediate = .{
                     .value = try inst.getImmediate(),
                     .size = .registerDefined,

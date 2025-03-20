@@ -146,6 +146,28 @@ pub fn main() !void {
                                 );
                             }
                         },
+                        .effective_address => {
+                            const source_address = registers.calculateEffectiveAddress(
+                                instruction_args[1].effective_address,
+                            );
+                            if (std.mem.eql(u8, opcode.name, "mov")) {
+                                // TODO: assumes wide
+                                const slice_size = 2; // cuz wide
+                                const source_end = source_address + slice_size;
+                                const slice = memory.sliceMemory(emu_mem, source_address, source_end);
+                                const val_from_mem = std.mem.readInt(
+                                    u16,
+                                    slice[0..slice_size],
+                                    .little,
+                                );
+                                target_reg.* = val_from_mem;
+                            } else {
+                                std.debug.print(
+                                    "unhandled mnemonic {s} register, effective_address: \n",
+                                    .{opcode.name},
+                                );
+                            }
+                        },
                         else => {
                             std.debug.print("unhandled second instruction argument: {s}\n", .{@tagName(instruction_args[1])});
                         },
@@ -237,6 +259,27 @@ pub fn main() !void {
                                 }
                             } else {
                                 std.debug.print("unhandled mnemonic for effective_address, immediate: {s}\n", .{opcode.name});
+                            }
+                        },
+                        .register => {
+                            assert(register_names.isWide(instruction_args[1].register));
+                            const source_reg = reg.getWideReg(&registers, instruction_args[1].register);
+
+                            if (std.mem.eql(u8, opcode.name, "mov")) {
+                                const slice_size = 2; // cuz wide
+                                const target_slice = memory.sliceMemory(
+                                    emu_mem,
+                                    target_address,
+                                    target_address + slice_size,
+                                );
+                                std.mem.writeInt(
+                                    u16,
+                                    target_slice[0..slice_size],
+                                    source_reg.*,
+                                    .little,
+                                );
+                            } else {
+                                std.debug.print("unhandled mnemonic for effective_address, register: {s}\n", .{opcode.name});
                             }
                         },
                         else => {

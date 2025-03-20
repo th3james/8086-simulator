@@ -254,7 +254,7 @@ test "instructionToString - absolute address arguments" {
     );
     defer allocator.free(result);
 
-    try std.testing.expectEqualStrings("mov al, byte [257]", result);
+    try std.testing.expectEqualStrings("mov al, [257]", result);
 }
 
 test "instructionToString - immediate word to absolute address" {
@@ -286,7 +286,7 @@ test "instructionToString - absolute address to byte register" {
     );
     defer allocator.free(result);
 
-    try std.testing.expectEqualStrings("mov bl, byte [1337]", result);
+    try std.testing.expectEqualStrings("mov bl, [1337]", result);
 }
 
 test "instructionToString - jmp with negative relative address argument" {

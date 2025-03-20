@@ -16,3 +16,4 @@ Final registers:
       bp: 0x0004 (4)
       ip: 0x0030 (48)
 
+   flags: 

@@ -9,6 +9,7 @@ const decode_errors = @import("decode/errors.zig");
 const instruction = @import("decode/instruction.zig");
 const decode_arguments = @import("decode/arguments.zig");
 const decode_print = @import("decode/print.zig");
+const register_names = @import("decode/register_names.zig");
 
 const InvalidBinaryErrors = error{ IncompleteInstruction, MissingDisplacementError };
 
@@ -90,6 +91,9 @@ pub fn main() !void {
 
             switch (instruction_args[0]) {
                 .register => {
+                    // TODO Only supporting wide addresses for now
+                    assert(register_names.isWide(instruction_args[0].register));
+
                     const target_reg = reg.getWideReg(&registers, instruction_args[0].register);
 
                     switch (instruction_args[1]) {
@@ -122,6 +126,26 @@ pub fn main() !void {
                                 flags.update(target_reg.*);
                             }
                         },
+                        .absolute_address => {
+                            const source_address = instruction_args[1].absolute_address;
+                            if (std.mem.eql(u8, opcode.name, "mov")) {
+                                // TODO: assumes wide
+                                const slice_size = 2; // cuz wide
+                                const source_end = source_address + slice_size;
+                                const slice = memory.sliceMemory(emu_mem, source_address, source_end);
+                                const val_from_mem = std.mem.readInt(
+                                    u16,
+                                    slice[0..slice_size],
+                                    .little,
+                                );
+                                target_reg.* = val_from_mem;
+                            } else {
+                                std.debug.print(
+                                    "unhandled mnemonic {s} register, absolute_address: \n",
+                                    .{opcode.name},
+                                );
+                            }
+                        },
                         else => {
                             std.debug.print("unhandled second instruction argument: {s}\n", .{@tagName(instruction_args[1])});
                         },
@@ -152,16 +176,22 @@ pub fn main() !void {
                             if (std.mem.eql(u8, opcode.name, "mov")) {
                                 switch (immediate.size) {
                                     .byte => {
-                                        emu_mem.bytes[target_address] = @intCast(
-                                            immediate.value,
-                                        );
+                                        unreachable; // narrow not supported
+                                        // emu_mem.bytes[target_address] = @intCast(
+                                        //     immediate.value,
+                                        // );
                                     },
                                     .word => {
-                                        std.mem.writePackedInt(
-                                            i16,
-                                            &emu_mem.bytes,
+                                        const slice_size = 2; // cuz wide
+                                        const target_slice = memory.sliceMemory(
+                                            emu_mem,
                                             target_address,
-                                            immediate.value,
+                                            target_address + slice_size,
+                                        );
+                                        std.mem.writeInt(
+                                            u16,
+                                            target_slice[0..slice_size],
+                                            @bitCast(immediate.value),
                                             .little,
                                         );
                                     },
@@ -187,16 +217,19 @@ pub fn main() !void {
                                 // TODO Duplication with absolute address
                                 switch (immediate.size) {
                                     .byte => {
-                                        emu_mem.bytes[target_address] = @intCast(
-                                            immediate.value,
-                                        );
+                                        unreachable; // narrow not supported
                                     },
                                     .word => {
-                                        std.mem.writePackedInt(
-                                            i16,
-                                            &emu_mem.bytes,
+                                        const slice_size = 2; // cuz wide
+                                        const target_slice = memory.sliceMemory(
+                                            emu_mem,
                                             target_address,
-                                            immediate.value,
+                                            target_address + slice_size,
+                                        );
+                                        std.mem.writeInt(
+                                            u16,
+                                            target_slice[0..slice_size],
+                                            @bitCast(immediate.value),
                                             .little,
                                         );
                                     },
